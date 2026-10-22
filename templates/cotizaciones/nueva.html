@@ -99,11 +99,18 @@
                 <option value="{{ razon['id'] }}">{{ razon['nombre'] }}{% if razon['ruc'] %} — RUC {{ razon['ruc'] }}{% endif %}</option>
                 {% endfor %}
             </select>
+            <div class="invalid-feedback">Selecciona la empresa emisora antes de guardar.</div>
             {% if not razones_sociales %}
             <div class="form-text text-danger">El administrador debe agregar las razones sociales antes de crear cotizaciones.</div>
             {% else %}
             <div class="form-text">La empresa elegida quedará guardada en esta cotización.</div>
             {% endif %}
+        </div>
+
+        <div class="mb-4">
+            <label for="fecha" class="form-label fw-bold">Fecha de emisión *</label>
+            <input type="date" class="form-control" id="fecha" name="fecha" value="{{ datos_formulario.get('fecha') or fecha_hoy }}" required>
+            <div class="form-text">Esta fecha aparecerá en el detalle y en el PDF de la cotización.</div>
         </div>
 
         <div class="section-title text-primary">
@@ -115,6 +122,8 @@
             <div class="col-md-6"><label for="cliente_celular" class="form-label">Celular</label><input type="tel" class="form-control" id="cliente_celular" name="cliente_celular" placeholder="999 999 999"></div>
             <div class="col-md-6"><label for="cliente_direccion" class="form-label">Dirección</label><input type="text" class="form-control" id="cliente_direccion" name="cliente_direccion" placeholder="Dirección del cliente"></div>
             <div class="col-md-6"><label for="cliente_ruc" class="form-label">RUC o DNI <span class="text-muted fw-normal">(opcional)</span></label><input type="text" class="form-control" id="cliente_ruc" name="cliente_ruc" placeholder="RUC o DNI"></div>
+            <div class="col-12"><small id="cliente_busqueda_estado" class="text-muted" role="status"></small></div>
+            <div class="col-12"><div id="cliente_historial" hidden></div></div>
         </div>
 
         <div class="section-title text-secondary mt-5">
@@ -135,8 +144,7 @@
                 {% for producto in productos_inventario %}
                 <option value="{{ producto[1] }}"
                         data-id="{{ producto[0] }}"
-                        data-price="{{ producto[2] }}"
-                        data-descripcion="{{ producto[3] if producto[3] else '' }}">
+                        data-price="{{ producto[2] }}">
                 {% endfor %}
             </datalist>
         </div>
@@ -145,11 +153,12 @@
             <table class="table table-hover mb-0" id="products_table">
                 <thead class="table-light">
                     <tr>
-                        <th style="width: 30%;">{{ t('inv_col_nombre') }}</th>
-                        <th style="width: 25%;">{{ t('inv_col_desc') }}</th>
-                        <th class="text-center" style="width: 10%;">{{ t('inv_col_cant') }}</th>
-                        <th class="text-center" style="width: 15%;">{{ t('inv_col_precio') }} (S/)</th>
-                        <th class="text-end" style="width: 15%;">{{ t('col_subtotal') }}</th>
+                        <th style="width: 5%;">#</th>
+                        <th style="width: 25%;">{{ t('inv_col_nombre') }}</th>
+                        <th class="text-center" style="width: 10%;">Unidad</th>
+                        <th class="text-center" style="width: 8%;">{{ t('inv_col_cant') }}</th>
+                        <th class="text-center" style="width: 13%;">{{ t('inv_col_precio') }} (S/)</th>
+                        <th class="text-end" style="width: 19%;">{{ t('col_subtotal') }}</th>
                         <th style="width: 5%;"></th>
                     </tr>
                 </thead>
@@ -157,47 +166,13 @@
                     </tbody>
                 <tfoot class="bg-light">
                     <tr>
-                        <td colspan="4" class="text-end fw-bold text-secondary pt-3">{{ t('lbl_total_pagar') }}</td>
+                        <td colspan="5" class="text-end fw-bold text-secondary pt-3">{{ t('lbl_total_pagar') }}</td>
                         <td colspan="2" class="text-end pt-3 pe-4">
-                            <span class="fs-4 fw-bold text-success">S/. <span id="total-cotizacion">0.00</span></span>
+                            <span class="fs-4 fw-bold text-success">S/ <span id="total-cotizacion">0.00</span></span>
                         </td>
                     </tr>
                 </tfoot>
             </table>
-        </div>
-
-        <div class="section-title text-secondary">
-            <i class="fas fa-hand-holding-usd me-2"></i>{{ t('sec_condiciones') }}
-        </div>
-
-        <div class="row g-4 mb-5">
-            <div class="col-md-6">
-                <div class="card h-100 border-0 shadow-sm bg-light">
-                    <div class="card-body">
-                        <label for="tipo_pago" class="form-label fw-bold">{{ t('lbl_metodo_preferente') }}</label>
-                        <select class="form-select" id="tipo_pago" name="tipo_pago">
-                            <option value="" selected>{{ t('lbl_seleccionar') }}</option>
-                            <option value="Efectivo">{{ t('pago_efectivo') }}</option>
-                            <option value="Transferencia Bancaria">{{ t('pago_transf') }}</option>
-                            <option value="Yape/Plin">Yape/Plin</option>
-                            <option value="Tarjeta de Crédito/Débito">{{ t('pago_tarjeta') }}</option>
-                        </select>
-                        <div class="invalid-feedback">{{ t('err_req_aprobada') }}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="card h-100 border-0 shadow-sm bg-light">
-                    <div class="card-body">
-                        <label for="estado_cotizacion" class="form-label fw-bold">{{ t('lbl_estado_inicial') }}</label>
-                        <select class="form-select border-primary" id="estado_cotizacion" name="estado_cotizacion">
-                            <option value="Pendiente" selected>🟡 {{ t('opt_pendiente_desc') }}</option>
-                        </select>
-                        <div class="form-text small mt-2"><i class="fas fa-info-circle"></i> {{ t('hlp_aprobada_req') }}</div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <div class="quote-editor__actions d-flex justify-content-end align-items-center gap-2">
@@ -225,11 +200,82 @@
         const productsTableBody = document.querySelector('#products_table tbody');
         const totalDisplay = document.getElementById('total-cotizacion');
         const totalHiddenInput = document.getElementById('total_cotizacion_hidden');
+        const formatMoney = value => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const cotizacionForm = document.getElementById('cotizacionForm');
         const productosSeleccionadosInput = document.getElementById('productos_seleccionados_input');
         const clienteNombreInput = document.getElementById('cliente_nombre');
-        const estadoSelect = document.getElementById('estado_cotizacion');
-        const pagoSelect = document.getElementById('tipo_pago');
+        const razonSocialInput = document.getElementById('razon_social_id');
+        const clienteCelularInput = document.getElementById('cliente_celular');
+        const clienteRucInput = document.getElementById('cliente_ruc');
+        const clienteBusquedaEstado = document.getElementById('cliente_busqueda_estado');
+        const clienteHistorial = document.getElementById('cliente_historial');
+
+        const mostrarHistorialCliente = (historial = []) => {
+            clienteHistorial.replaceChildren();
+            clienteHistorial.hidden = historial.length === 0;
+            if (!historial.length) return;
+
+            const card = document.createElement('div');
+            card.className = 'alert alert-light border mt-2 mb-0';
+            const title = document.createElement('strong');
+            title.textContent = 'Historial de cotizaciones del cliente';
+            card.appendChild(title);
+            const list = document.createElement('ul');
+            list.className = 'list-group list-group-flush mt-2';
+            historial.forEach(item => {
+                const row = document.createElement('li');
+                row.className = 'list-group-item px-0 bg-transparent';
+                const reference = item.numero_cotizacion || `#${item.id}`;
+                const summary = document.createElement('div');
+                summary.textContent = `${reference} | ${item.fecha || ''} | ${item.estado} | S/ ${Number(item.total || 0).toFixed(2)}`;
+                row.appendChild(summary);
+                if (item.observacion_rechazo) {
+                    const note = document.createElement('small');
+                    note.className = 'd-block text-danger';
+                    note.textContent = `Motivo del rechazo: ${item.observacion_rechazo}`;
+                    row.appendChild(note);
+                }
+                list.appendChild(row);
+            });
+            card.appendChild(list);
+            clienteHistorial.appendChild(card);
+        };
+
+        const buscarClienteGuardado = async (tipo, input) => {
+            const digitos = input.value.replace(/\D/g, '');
+            if (digitos.length < 8) return;
+
+            clienteBusquedaEstado.textContent = 'Buscando datos guardados...';
+            try {
+                const parametros = new URLSearchParams({ tipo, valor: input.value });
+                const respuesta = await fetch('/cotizaciones/buscar_cliente?' + parametros);
+                const datos = await respuesta.json();
+                if (!respuesta.ok) throw new Error('No se pudo buscar.');
+
+                if (!datos.encontrado) {
+                    mostrarHistorialCliente();
+                    clienteBusquedaEstado.textContent = 'No hay datos previos para ese numero.';
+                    return;
+                }
+
+                const completarSiVacio = (id, valor) => {
+                    const campo = document.getElementById(id);
+                    if (valor && !campo.value.trim()) campo.value = valor;
+                };
+                completarSiVacio('cliente_nombre', datos.nombre);
+                completarSiVacio('cliente_celular', datos.celular);
+                completarSiVacio('cliente_direccion', datos.direccion);
+                completarSiVacio('cliente_ruc', datos.ruc);
+                mostrarHistorialCliente(datos.historial || []);
+                clienteBusquedaEstado.textContent = 'Cliente encontrado. Se completaron los campos vacios; puedes editarlos.';
+            } catch (error) {
+                mostrarHistorialCliente();
+                clienteBusquedaEstado.textContent = 'No se pudieron recuperar los datos del cliente.';
+            }
+        };
+
+        clienteCelularInput.addEventListener('blur', () => buscarClienteGuardado('celular', clienteCelularInput));
+        clienteRucInput.addEventListener('blur', () => buscarClienteGuardado('ruc', clienteRucInput));
 
         // --- DATOS INVENTARIO ---
         const datalistOptions = document.getElementById('product_options').options;
@@ -237,8 +283,15 @@
             id: option.dataset.id,
             nombre: option.value,
             precio: parseFloat(option.dataset.price),
-            descripcion: option.dataset.descripcion || '',
         }));
+        const datosFormulario = {{ datos_formulario|tojson }};
+        const productosIniciales = {{ productos_iniciales|tojson }};
+        razonSocialInput.value = datosFormulario.razon_social_id || '';
+        razonSocialInput.addEventListener('change', () => razonSocialInput.classList.remove('is-invalid'));
+        ['cliente_nombre', 'cliente_celular', 'cliente_direccion', 'cliente_ruc'].forEach(id => {
+            const input = document.getElementById(id);
+            if (datosFormulario[id]) input.value = datosFormulario[id];
+        });
 
         // --- CÁLCULO DE TOTALES ---
         const updateTotal = () => {
@@ -247,10 +300,12 @@
                 // Buscamos el span dentro de la celda de subtotal para mayor precisión
                 const subtotalCell = row.querySelector('.subtotal-val');
                 if(subtotalCell) {
-                    total += parseFloat(subtotalCell.textContent) || 0;
+                    const cantidad = Number.parseFloat(row.querySelector('.quantity-input').value) || 0;
+                    const precio = Number.parseFloat(row.querySelector('.price-input').value) || 0;
+                    total += cantidad * precio;
                 }
             });
-            totalDisplay.textContent = total.toFixed(2);
+            totalDisplay.textContent = formatMoney(total);
             totalHiddenInput.value = total.toFixed(2);
         };
 
@@ -262,32 +317,38 @@
             // Actualizamos el texto visible
             const subtotalCell = row.querySelector('.subtotal-display');
             if(subtotalCell) {
-                subtotalCell.innerHTML = `S/. <span class="subtotal-val">${subtotal.toFixed(2)}</span>`;
+                subtotalCell.innerHTML = `S/ <span class="subtotal-val">${formatMoney(subtotal)}</span>`;
             }
             updateTotal();
         }
 
         // --- CREAR FILA HTML ---
-        const createProductRow = (producto) => {
+        const createProductRow = (producto, inicial = {}) => {
             const row = document.createElement('tr');
             row.dataset.id = producto.id;
-
-            // INYECTAMOS LA VARIABLE DE TRADUCCIÓN EN EL PLACEHOLDER
-            const placeholderDetalle = "{{ t('js_detalles') }}";
+            const cantidadInicial = Number(inicial.cantidad) > 0 ? Number(inicial.cantidad) : 1;
+            const unidadInicial = inicial.unidad || 'und';
+            const precioInicial = Number(inicial.precio) > 0 ? Number(inicial.precio) : producto.precio;
 
             row.innerHTML = `
+                <td class="text-center">${productsTableBody.children.length + 1}</td>
                 <td class="fw-bold text-primary">${producto.nombre}</td>
                 <td>
-                    <input type="text" class="form-control form-control-sm description-input" value="${producto.descripcion}" placeholder="${placeholderDetalle}">
+                    <select class="form-select form-select-sm unit-input" aria-label="Unidad del producto">
+                        <option value="und" ${unidadInicial === 'und' ? 'selected' : ''}>und</option>
+                        <option value="caja" ${unidadInicial === 'caja' ? 'selected' : ''}>caja</option>
+                        <option value="paquete" ${unidadInicial === 'paquete' ? 'selected' : ''}>paquete</option>
+                        <option value="par" ${unidadInicial === 'par' ? 'selected' : ''}>par</option>
+                    </select>
                 </td>
                 <td>
-                    <input type="number" class="form-control form-control-sm quantity-input text-center fw-bold" value="1" min="1">
+                    <input type="number" class="form-control form-control-sm quantity-input text-center fw-bold" value="${cantidadInicial}" min="1">
                 </td>
                 <td>
-                    <input type="number" class="form-control form-control-sm price-input text-center" value="${producto.precio.toFixed(2)}" min="0.01" step="0.01">
+                    <input type="number" class="form-control form-control-sm price-input text-center" value="${precioInicial.toFixed(2)}" min="0.01" step="0.01">
                 </td>
                 <td class="text-end fw-bold subtotal-display">
-                    S/. <span class="subtotal-val">${producto.precio.toFixed(2)}</span>
+                    S/ <span class="subtotal-val">${formatMoney(cantidadInicial * precioInicial)}</span>
                 </td>
                 <td class="text-center">
                     <button type="button" class="btn btn-outline-danger btn-sm border-0 remove-product-btn" title="Quitar producto" aria-label="Quitar producto">
@@ -298,6 +359,11 @@
             productsTableBody.appendChild(row);
             updateTotal();
         };
+
+        productosIniciales.forEach(item => {
+            const producto = productosInventario.find(p => String(p.id) === String(item.id));
+            if (producto) createProductRow(producto, item);
+        });
 
         // --- AGREGAR PRODUCTO ---
         addProductBtn.addEventListener('click', () => {
@@ -341,6 +407,7 @@
         productsTableBody.addEventListener('click', (e) => {
             if (e.target.closest('.remove-product-btn')) {
                 e.target.closest('tr').remove();
+                productsTableBody.querySelectorAll('tr').forEach((row, index) => row.cells[0].textContent = index + 1);
                 updateTotal();
             }
         });
@@ -356,7 +423,13 @@
 
         // --- ENVÍO DEL FORMULARIO ---
         cotizacionForm.addEventListener('submit', (e) => {
-            pagoSelect.classList.remove('is-invalid');
+            if (!razonSocialInput.value) {
+                e.preventDefault();
+                razonSocialInput.classList.add('is-invalid');
+                razonSocialInput.focus();
+                return;
+            }
+            razonSocialInput.classList.remove('is-invalid');
 
             // El nombre identifica la cotización y es obligatorio.
             const clienteNombre = clienteNombreInput.value.trim();
@@ -373,19 +446,18 @@
             productsTableBody.querySelectorAll('tr').forEach(row => {
                 const quantityInput = row.querySelector('.quantity-input');
                 const priceInput = row.querySelector('.price-input');
-                const descriptionInput = row.querySelector('.description-input');
+                const unitInput = row.querySelector('.unit-input');
 
                 const id = row.dataset.id;
                 const cantidad = parseFloat(quantityInput.value) || 0;
                 const precio = parseFloat(priceInput.value) || 0;
-                const descripcion = descriptionInput.value.trim();
 
                 if (cantidad > 0 && precio > 0) {
                     productos.push({
                         id: id,
                         cantidad: cantidad,
                         precio: precio,
-                        descripcion: descripcion
+                        unidad: unitInput.value
                     });
                 }
             });
@@ -397,21 +469,11 @@
                 return;
             }
 
-            // 3. Validar Pago si es Aprobada
-            const estado = estadoSelect.value;
-            const pago = pagoSelect.value;
-
-            if (estado === 'Pagada' && (pago === '' || pago === null)) {
-                e.preventDefault();
-                // TRADUCCIÓN JS
-                alert("{{ t('js_err_aprobada_pago') }}");
-                pagoSelect.classList.add('is-invalid');
-                pagoSelect.focus();
-                return;
-            }
-
             // Todo OK
             productosSeleccionadosInput.value = JSON.stringify(productos);
+            if (!window.confirm('Confirmas guardar la cotizacion?')) {
+                e.preventDefault();
+            }
         });
 
         updateTotal();

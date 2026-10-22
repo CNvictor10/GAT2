@@ -83,6 +83,7 @@ def agregar_inventario():
     if request.method == 'POST':
         try:
             imagen = guardar_imagen_producto(request.files.get('imagen'))
+            precio_unitario = float(request.form.get('precio_unitario') or request.form.get('precio_unidad_nuevo') or 0)
             conn = crear_conexion()
             cursor = conn.cursor()
             
@@ -106,11 +107,11 @@ def agregar_inventario():
                 nombre_zh,
                 request.form['descripcion'],
                 int(request.form['cantidad']),
-                float(request.form['precio_unitario']),
-                float(request.form.get('precio_unidad_nuevo', 0)),
+                precio_unitario,
+                precio_unitario,
                 int(request.form['umbral_stock']),
                 0,
-                int(request.form.get('unidades_por_caja', 0)),
+                0,
                 imagen
             ))
             
@@ -137,6 +138,7 @@ def editar_inventario(id):
         try:
             imagen_actual = producto.get('imagen', '')
             archivo_imagen = request.files.get('imagen')
+            precio_unitario = float(request.form.get('precio_unitario') or request.form.get('precio_unidad_nuevo') or 0)
             nueva_imagen = guardar_imagen_producto(archivo_imagen) if archivo_imagen and archivo_imagen.filename else imagen_actual
             if request.form.get('quitar_imagen') == '1':
                 nueva_imagen = ''
@@ -160,12 +162,12 @@ def editar_inventario(id):
                 request.form['nombre'],
                 request.form['descripcion'],
                 int(request.form['cantidad']),
-                float(request.form['precio_unitario']),
-                float(request.form.get('precio_unidad_nuevo', 0)),
+                precio_unitario,
+                precio_unitario,
                 int(request.form['umbral_stock']),
                 # El costo es interno y este formulario no lo modifica.
                 float(producto.get('costo_adquisicion', 0)),
-                int(request.form.get('unidades_por_caja', 0)),
+                0,
                 nueva_imagen,
                 id
             ))

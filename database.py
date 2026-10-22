@@ -69,6 +69,22 @@ def asegurar_columna_unidades_por_caja(conn=None):
         conn.close()
 
 
+def asegurar_columna_unidad_cotizacion(conn=None):
+    """Guarda la unidad elegida para cada producto cotizado."""
+    cerrar_conexion = conn is None
+    conn = conn or crear_conexion()
+    tabla = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='cotizacion_detalles'"
+    ).fetchone()
+    if tabla:
+        columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(cotizacion_detalles)")}
+        if 'unidad' not in columnas:
+            conn.execute("ALTER TABLE cotizacion_detalles ADD COLUMN unidad TEXT NOT NULL DEFAULT 'und'")
+            conn.commit()
+    if cerrar_conexion:
+        conn.close()
+
+
 def asegurar_columna_imagen_producto(conn=None):
     """Añade la ruta de imagen al catálogo existente sin alterar sus productos."""
     cerrar_conexion = conn is None
@@ -151,6 +167,8 @@ def asegurar_columnas_folios_y_cierres(conn=None):
         columnas = {fila[1] for fila in conn.execute('PRAGMA table_info(cotizaciones)')}
         if 'numero_cotizacion' not in columnas:
             conn.execute("ALTER TABLE cotizaciones ADD COLUMN numero_cotizacion TEXT NOT NULL DEFAULT ''")
+        if 'observacion_rechazo' not in columnas:
+            conn.execute("ALTER TABLE cotizaciones ADD COLUMN observacion_rechazo TEXT NOT NULL DEFAULT ''")
         filas_sin_folio = conn.execute(
             "SELECT id, fecha FROM cotizaciones WHERE numero_cotizacion IS NULL OR numero_cotizacion='' ORDER BY fecha, id"
         ).fetchall()
@@ -308,8 +326,10 @@ def inicializar_db():
     check_and_add_column('inventario', 'imagen', 'TEXT', '')
     check_and_add_column('cotizaciones', 'fecha_aprobacion', 'TEXT', 'NULL')
     check_and_add_column('cotizaciones', 'cliente_direccion', 'TEXT', '')
+    check_and_add_column('cotizaciones', 'observacion_rechazo', 'TEXT', '')
     # Asigna folios mensuales a los registros históricos, conservando el ID interno.
     check_and_add_column('cotizacion_detalles', 'costo_unitario', 'REAL', 0.0)
+    check_and_add_column('cotizacion_detalles', 'unidad', "TEXT", 'und')
     check_and_add_column('movimientos_caja', 'tipo_pago', 'TEXT', 'Efectivo')
     check_and_add_column('cierres_caja', 'diferencia_total', 'REAL', 0.0)
     check_and_add_column('cierres_caja', 'monto_apertura', 'REAL', 0.0)
@@ -358,7 +378,7 @@ def registrar_pago_cotizacion(cotizacion_id, monto, tipo_pago):
         if monto <= 0:
             return {"success": False, "message": "El monto del abono debe ser mayor que cero."}
         if monto > saldo + 0.001:
-            return {"success": False, "message": f"El abono supera el saldo pendiente de S/ {saldo:.2f}."}
+            return {"success": False, "message": f"El abono supera el saldo pendiente de S/ {saldo:,.2f}."}
         if not tipo_pago or not tipo_pago.strip():
             return {"success": False, "message": "Selecciona el medio de pago."}
 
@@ -397,7 +417,7 @@ def registrar_pago_cotizacion(cotizacion_id, monto, tipo_pago):
         cursor.execute("INSERT INTO movimientos_caja (cotizacion_id, fecha, ingreso_total, costo_total, tipo_pago) VALUES (?,?,?,?,?)",
                        (cotizacion_id, fecha_pago, monto, cogs, tipo_pago))
         conn.commit()
-        mensaje = "Pago completo registrado." if nuevo_estado == 'Pagada' else f"Abono registrado. Saldo pendiente: S/ {total - nuevo_pagado:.2f}."
+        mensaje = "Pago completo registrado." if nuevo_estado == 'Pagada' else f"Abono registrado. Saldo pendiente: S/ {total - nuevo_pagado:,.2f}."
         if primer_abono:
             mensaje += " Stock descontado."
         return {"success": True, "message": mensaje}

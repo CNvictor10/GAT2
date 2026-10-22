@@ -55,88 +55,48 @@
 
     <form method="POST" action="{{ url_for('editar_cotizacion', id=cotizacion.id) }}" id="editarCotizacionForm" class="needs-validation" novalidate>
 
-        {# --- SECCIÓN: DATOS DEL CLIENTE --- #}
+
+        {# --- SECCI?N: DATOS DEL CLIENTE --- #}
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-light"><strong>{{ t('sec_datos_cliente') }}</strong></div>
             <div class="card-body">
                 <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="fecha" class="form-label">Fecha de emisión (*)</label>
+                        <input type="date" class="form-control" id="fecha" name="fecha" value="{{ cotizacion['fecha'][:10] }}" required>
+                    </div>
                     <div class="col-12">
                         <label for="razon_social_id" class="form-label">Razón social emisora (*)</label>
                         <select class="form-select" id="razon_social_id" name="razon_social_id" required>
                             <option value="" disabled {% if not cotizacion['razon_social_id'] %}selected{% endif %}>Selecciona la empresa emisora</option>
                             {% for razon in razones_sociales %}
                             <option value="{{ razon['id'] }}" {% if razon['id'] == cotizacion['razon_social_id'] %}selected{% endif %}>
-                                {{ razon['nombre'] }}{% if razon['ruc'] %} — RUC {{ razon['ruc'] }}{% endif %}{% if not razon['activa'] %} (inactiva; solo para esta cotización){% endif %}
+                                {{ razon['nombre'] }}{% if razon['ruc'] %} ? RUC {{ razon['ruc'] }}{% endif %}{% if not razon['activa'] %} (inactiva; solo para esta cotización){% endif %}
                             </option>
                             {% endfor %}
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <div>
-                            <label for="cliente_nombre" class="form-label">{{ t('cot_col_cliente') }} (*)</label>
-                            <input type="text" class="form-control" id="cliente_nombre" name="cliente_nombre" value="{{ cotizacion.cliente_nombre }}" required>
-                        </div>
+                        <label for="cliente_nombre" class="form-label">{{ t('cot_col_cliente') }} (*)</label>
+                        <input type="text" class="form-control" id="cliente_nombre" name="cliente_nombre" value="{{ cotizacion.cliente_nombre }}" required>
                     </div>
                     <div class="col-md-6">
-                        <div>
-                            <label for="cliente_celular" class="form-label">{{ t('lbl_celular') }} {{ t('lbl_opcional') }}</label>
-                            <input type="text" class="form-control" id="cliente_celular" name="cliente_celular" value="{{ cotizacion.cliente_celular or '' }}">
-                        </div>
+                        <label for="cliente_celular" class="form-label">{{ t('lbl_celular') }} {{ t('lbl_opcional') }}</label>
+                        <input type="text" class="form-control" id="cliente_celular" name="cliente_celular" value="{{ cotizacion.cliente_celular or '' }}">
                     </div>
                     <div class="col-md-6">
-                        <div>
-                            <label for="cliente_ruc" class="form-label">{{ t('lbl_ruc') }} {{ t('lbl_opcional') }}</label>
-                            <input type="text" class="form-control" id="cliente_ruc" name="cliente_ruc" value="{{ cotizacion.cliente_ruc or '' }}">
-                        </div>
+                        <label for="cliente_ruc" class="form-label">{{ t('lbl_ruc') }} {{ t('lbl_opcional') }}</label>
+                        <input type="text" class="form-control" id="cliente_ruc" name="cliente_ruc" value="{{ cotizacion.cliente_ruc or '' }}">
                     </div>
                     <div class="col-md-6">
-                        <div>
-                            <label for="cliente_direccion" class="form-label">{{ t('lbl_direccion') }} {{ t('lbl_opcional') }}</label>
-                            <input type="text" class="form-control" id="cliente_direccion" name="cliente_direccion" value="{{ cotizacion.cliente_direccion or '' }}">
-                        </div>
+                        <label for="cliente_direccion" class="form-label">{{ t('lbl_direccion') }} {{ t('lbl_opcional') }}</label>
+                        <input type="text" class="form-control" id="cliente_direccion" name="cliente_direccion" value="{{ cotizacion.cliente_direccion or '' }}">
                     </div>
                 </div>
             </div>
         </div>
 
-        {# --- SECCIÓN: CONDICIONES --- #}
-        <div class="card mb-4 shadow-sm">
-            <div class="card-header bg-light"><strong>{{ t('sec_condiciones') }}</strong></div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <div>
-                            <label for="tipo_pago" class="form-label fw-bold">{{ t('cot_col_pago') }} (*)</label>
-                            <select class="form-select" id="tipo_pago" name="tipo_pago">
-                                <option value="" {% if not cotizacion.tipo_pago %}selected{% endif %}>{{ t('lbl_seleccionar') }}</option>
-                                <option value="Efectivo" {% if cotizacion.tipo_pago == 'Efectivo' %}selected{% endif %}>{{ t('pago_efectivo') }}</option>
-                                <option value="Yape" {% if cotizacion.tipo_pago == 'Yape' %}selected{% endif %}>Yape</option>
-                                <option value="Plin" {% if cotizacion.tipo_pago == 'Plin' %}selected{% endif %}>Plin</option>
-                                <option value="Transferencia BCP" {% if cotizacion.tipo_pago == 'Transferencia BCP' %}selected{% endif %}>BCP {{ t('pago_transf') }}</option>
-                                <option value="Transferencia Interbank" {% if cotizacion.tipo_pago == 'Transferencia Interbank' %}selected{% endif %}>Interbank {{ t('pago_transf') }}</option>
-                                <option value="Tarjeta" {% if cotizacion.tipo_pago == 'Tarjeta' %}selected{% endif %}>{{ t('pago_tarjeta') }}</option>
-                                <option value="Otro" {% if cotizacion.tipo_pago == 'Otro' %}selected{% endif %}>{{ t('pago_otro') }}</option>
-                            </select>
-                            <div class="invalid-feedback">{{ t('msg_validar_pago') }}</div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div>
-                            <label for="estado" class="form-label fw-bold">{{ t('cot_col_estado') }} (*)</label>
-                            <select class="form-select" id="estado" name="estado" required>
-                                <option value="Pendiente" {% if cotizacion.estado == 'Pendiente' %}selected{% endif %}>{{ t('cot_estado_pendiente') }}</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div>
-                            <label class="form-label">{{ t('cot_col_fecha') }}</label>
-                            <input type="text" class="form-control bg-light" value="{{ cotizacion.fecha }}" readonly disabled>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+
 
         {# --- SECCIÓN: DETALLES DE PRODUCTOS --- #}
         <h4 class="mt-4"><i class="fas fa-boxes me-2"></i>{{ t('sec_detalles_prod') }}</h4>
@@ -144,12 +104,12 @@
 
             {# Cabecera oculta en móviles #}
             <div class="row fw-bold border-bottom pb-2 mb-2 d-none d-md-flex text-secondary">
-                <div class="col-md-2">{{ t('inv_col_nombre') }}</div>
-                <div class="col-md-2">{{ t('inv_col_desc') }} {{ t('lbl_editable') }}</div>
+                <div class="col-md-1 text-center">#</div>
+                <div class="col-md-3">{{ t('inv_col_nombre') }}</div>
+                <div class="col-md-1 text-center">Unidad</div>
                 <div class="col-md-1 text-center">{{ t('inv_col_cant') }}</div>
-                <div class="col-md-2">Costo unitario</div>
                 <div class="col-md-2">{{ t('inv_col_precio') }} unitario</div>
-                <div class="col-md-2 text-end">{{ t('col_subtotal') }}</div>
+                <div class="col-md-3 text-end">{{ t('col_subtotal') }}</div>
                 <div class="col-md-1"></div>
             </div>
 
@@ -160,10 +120,8 @@
                     <i class="fa fa-plus-circle"></i> {{ t('btn_anadir_prod') }}
                 </button>
                 <p class="total-summary mb-0">
-                    {{ t('cot_col_total') }}: <span class="text-primary fw-bold">S/. <span id="totalCotizacionDisplay">0.00</span></span>
+                    {{ t('cot_col_total') }}: <span class="text-primary fw-bold">S/ <span id="totalCotizacionDisplay">0.00</span></span>
                 </p>
-                <p class="mb-0 text-danger fw-semibold">Costo total: S/. <span id="totalCostoDisplay">0.00</span></p>
-                <p class="mb-0 text-success fw-semibold">Margen estimado: S/. <span id="margenDisplay">0.00</span></p>
             </div>
         </div>
 
@@ -188,16 +146,19 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label for="producto_select" class="form-label fw-bold">{{ t('inv_col_nombre') }} (*)</label>
+                    <label for="producto_filtro" class="form-label fw-bold">{{ t('lbl_buscar_inv') }}</label>
+                    <input type="search" class="form-control mb-2" id="producto_filtro"
+                           placeholder="{{ t('ph_escribe_prod') }}" autocomplete="off">
+                    <small id="producto_filtro_estado" class="form-text text-muted" aria-live="polite"></small>
+                    <label for="producto_select" class="form-label fw-bold mt-2">{{ t('inv_col_nombre') }} (*)</label>
                     <select class="form-select" id="producto_select">
                         <option value="">{{ t('lbl_seleccionar') }}</option>
                         {% for producto in productos_inventario %}
                             <option value="{{ producto[0] }}"
                                     data-nombre="{{ producto[1] }}"
                                     data-precio="{{ producto[2] }}"
-                                    data-desc="{{ producto[3] or '' }}"
-                                    data-costo="{{ producto[4] or 0 }}">
-                                {{ producto[1] }} (S/. {{ "%.2f"|format(producto[2]) }})
+                                    data-costo="{{ producto[3] or 0 }}">
+                                {{ producto[1] }} (S/ {{ producto[2]|dinero }})
                             </option>
                         {% endfor %}
                     </select>
@@ -211,20 +172,16 @@
                     </div>
                     <div class="col-4">
                         <div class="mb-3">
-                            <label for="precio_input" class="form-label fw-bold">{{ t('inv_col_precio') }} (S/.) (*)</label>
+                            <label for="precio_input" class="form-label fw-bold">{{ t('inv_col_precio') }} (S/) (*)</label>
                             <input type="number" class="form-control" id="precio_input" step="0.01" min="0.01">
                         </div>
                     </div>
                     <div class="col-4">
                         <div class="mb-3">
-                            <label for="costo_input" class="form-label fw-bold">Costo unit. (S/.)</label>
+                            <label for="costo_input" class="form-label fw-bold">Costo unit. (S/)</label>
                             <input type="number" class="form-control" id="costo_input" step="0.01" min="0">
                         </div>
                     </div>
-                </div>
-                <div class="mb-2">
-                    <label for="descripcion_input" class="form-label fw-bold">{{ t('inv_col_desc') }} {{ t('lbl_editable') }}</label>
-                    <textarea class="form-control" id="descripcion_input" rows="2"></textarea>
                 </div>
             </div>
             <div class="modal-footer bg-light">
@@ -237,6 +194,7 @@
 
 <script>
     let detallesCotizacion = [];
+    const formatMoney = value => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const detallesIniciales = {{ detalles | tojson }};
 
     // Inicializar datos del backend
@@ -245,7 +203,7 @@
             temp_id: Date.now() + Math.random(),
             producto_id: item.producto_id,
             nombre: item.nombre_producto,
-            descripcion: item.descripcion || '',
+            unidad: item.unidad || 'und',
             cantidad: parseInt(item.cantidad),
             precio: parseFloat(item.precio_unitario_cotizado),
             costo: parseFloat(item.costo_unitario || 0)
@@ -253,9 +211,9 @@
     });
 
     // --- MANEJO DE CAMBIOS DINÁMICOS DESDE LA TABLA ---
-    function updateDetalleDescripcion(tempId, nuevaDesc) {
+    function updateDetalleUnidad(tempId, unidad) {
         const item = detallesCotizacion.find(i => i.temp_id === parseFloat(tempId));
-        if (item) item.descripcion = nuevaDesc;
+        if (item) item.unidad = unidad;
     }
 
     function updateDetalleCantidad(tempId, val) {
@@ -292,12 +250,10 @@
             totalCosto += item.cantidad * item.costo;
             const subtotalEl = document.getElementById(`subtotal-${item.temp_id}`);
             if (subtotalEl) {
-                subtotalEl.textContent = subtotal.toFixed(2);
+                subtotalEl.textContent = formatMoney(subtotal);
             }
         });
-        document.getElementById('totalCotizacionDisplay').textContent = total.toFixed(2);
-        document.getElementById('totalCostoDisplay').textContent = totalCosto.toFixed(2);
-        document.getElementById('margenDisplay').textContent = (total - totalCosto).toFixed(2);
+        document.getElementById('totalCotizacionDisplay').textContent = formatMoney(total);
     }
 
     // --- RENDERIZADO DEL CONTENEDOR DE PRODUCTOS ---
@@ -310,27 +266,30 @@
         if (detallesCotizacion.length === 0) {
             htmlContent = '<div class="alert alert-warning text-center my-3"><i class="fas fa-exclamation-triangle me-2"></i>{{ t("msg_cot_vacia") }}</div>';
         } else {
-            detallesCotizacion.forEach((item) => {
+            detallesCotizacion.forEach((item, index) => {
                 const subtotal = item.cantidad * item.precio;
                 total += subtotal;
                 totalCosto += item.cantidad * item.costo;
 
                 htmlContent += `
                     <div class="detalle-row row align-items-center g-2" id="row-${item.temp_id}">
-                        <div class="col-md-2 col-12 fw-bold text-dark">
+                        <div class="col-md-1 col-2 text-center text-muted">
+                            <span class="d-md-none text-muted small d-block fw-normal">#</span>
+                            ${index + 1}
+                        </div>
+                        <div class="col-md-3 col-10 fw-bold text-dark">
                             <span class="d-md-none text-muted small d-block fw-normal">{{ t('inv_col_nombre') }}:</span>
                             ${item.nombre}
                         </div>
 
-                        <div class="col-md-2 col-12">
-                            <span class="d-md-none text-muted small d-block mb-1">{{ t('inv_col_desc') }}:</span>
-                            <input type="text" class="form-control form-control-sm"
-                                   value="${item.descripcion}"
-                                   placeholder="{{ t('inv_col_desc') }}..."
-                                   onchange="updateDetalleDescripcion('${item.temp_id}', this.value)">
+                        <div class="col-md-1 col-6">
+                            <span class="d-md-none text-muted small d-block mb-1">Unidad:</span>
+                            <select class="form-select form-select-sm" onchange="updateDetalleUnidad('${item.temp_id}', this.value)">
+                                ${['und', 'caja', 'paquete', 'par'].map(unidad => `<option value="${unidad}" ${item.unidad === unidad ? 'selected' : ''}>${unidad}</option>`).join('')}
+                            </select>
                         </div>
 
-                        <div class="col-md-1 col-4">
+                        <div class="col-md-1 col-6">
                             <span class="d-md-none text-muted small d-block mb-1 text-start">{{ t('inv_col_cant') }}:</span>
                             <input type="number" class="form-control form-control-sm text-center"
                                    value="${item.cantidad}" min="1"
@@ -338,28 +297,18 @@
                         </div>
 
                         <div class="col-md-2 col-6">
-                            <span class="d-md-none text-muted small d-block mb-1">Costo unitario:</span>
-                            <div class="input-group input-group-sm">
-                                <span class="input-group-text">S/.</span>
-                                <input type="number" class="form-control"
-                                       value="${item.costo.toFixed(2)}" step="0.01" min="0"
-                                       oninput="updateDetalleCosto('${item.temp_id}', this.value)">
-                            </div>
-                        </div>
-
-                        <div class="col-md-2 col-6">
                             <span class="d-md-none text-muted small d-block mb-1">{{ t('inv_col_precio') }} unitario:</span>
                             <div class="input-group input-group-sm">
-                                <span class="input-group-text">S/.</span>
+                                <span class="input-group-text">S/</span>
                                 <input type="number" class="form-control"
                                        value="${item.precio.toFixed(2)}" step="0.01" min="0.01"
                                        oninput="updateDetallePrecio('${item.temp_id}', this.value)">
                             </div>
                         </div>
 
-                        <div class="col-md-2 col-8 text-md-end fw-bold text-primary mt-2 mt-md-0">
+                        <div class="col-md-3 col-8 text-md-end fw-bold text-primary mt-2 mt-md-0">
                             <span class="d-md-none text-muted small d-inline fw-normal me-1">{{ t('col_subtotal') }}:</span>
-                            S/. <span id="subtotal-${item.temp_id}">${subtotal.toFixed(2)}</span>
+                            S/ <span id="subtotal-${item.temp_id}">${formatMoney(subtotal)}</span>
                         </div>
 
                         <div class="col-md-1 col-4 text-end mt-2 mt-md-0">
@@ -374,9 +323,7 @@
         }
 
         container.innerHTML = htmlContent;
-        document.getElementById('totalCotizacionDisplay').textContent = total.toFixed(2);
-        document.getElementById('totalCostoDisplay').textContent = totalCosto.toFixed(2);
-        document.getElementById('margenDisplay').textContent = (total - totalCosto).toFixed(2);
+        document.getElementById('totalCotizacionDisplay').textContent = formatMoney(total);
     }
 
     // --- LÓGICA AGREGAR ITEM (INCREMENTA SI YA EXISTE) ---
@@ -388,7 +335,6 @@
         const cantidad = parseInt(document.getElementById('cantidad_input').value);
         const precio = parseFloat(document.getElementById('precio_input').value);
         const costo = parseFloat(document.getElementById('costo_input').value) || 0;
-        const descripcion = document.getElementById('descripcion_input').value;
 
         if (!productoId || isNaN(cantidad) || cantidad <= 0 || isNaN(precio)) {
             alert('{{ t("msg_datos_inv") }}'); 
@@ -404,10 +350,10 @@
                 temp_id: Date.now() + Math.random(),
                 producto_id: parseInt(productoId),
                 nombre: nombre,
-                descripcion: descripcion,
                 cantidad: cantidad,
                 precio: precio,
-                costo: costo
+                costo: costo,
+                unidad: 'und'
             });
         }
 
@@ -427,21 +373,58 @@
 
     function limpiarModal() {
         document.getElementById('producto_select').value = '';
+        document.getElementById('producto_filtro').value = '';
+        aplicarFiltroProductos();
         document.getElementById('cantidad_input').value = 1;
         document.getElementById('precio_input').value = '';
         document.getElementById('costo_input').value = '';
-        document.getElementById('descripcion_input').value = '';
     }
 
     // Autocompletado del Modal al cambiar opción
+    // Filtra el inventario del selector por nombre.
+    const filtroProducto = document.getElementById('producto_filtro');
+    const selectorProductos = document.getElementById('producto_select');
+    const estadoFiltroProducto = document.getElementById('producto_filtro_estado');
+    const opcionInicialProducto = selectorProductos.options[0].cloneNode(true);
+    const opcionesProducto = Array.from(selectorProductos.options).slice(1).map(opcion => opcion.cloneNode(true));
+
+    function aplicarFiltroProductos() {
+        const consulta = filtroProducto.value.trim().toLocaleLowerCase();
+        const seleccionAnterior = selectorProductos.value;
+        const resultados = opcionesProducto.filter(opcion => {
+            const texto = `${opcion.dataset.nombre || ''} ${opcion.textContent || ''}`.toLocaleLowerCase();
+            return !consulta || texto.includes(consulta);
+        });
+
+        // Reconstruir el select evita que los navegadores moviles ignoren option.hidden.
+        selectorProductos.replaceChildren(opcionInicialProducto.cloneNode(true), ...resultados.map(opcion => opcion.cloneNode(true)));
+        if (resultados.some(opcion => opcion.value === seleccionAnterior)) {
+            selectorProductos.value = seleccionAnterior;
+        } else if (seleccionAnterior) {
+            document.getElementById('precio_input').value = '';
+            document.getElementById('costo_input').value = '';
+        }
+
+        if (consulta && resultados.length === 1 && selectorProductos.value !== resultados[0].value) {
+            selectorProductos.value = resultados[0].value;
+            selectorProductos.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        estadoFiltroProducto.textContent = consulta
+            ? (resultados.length === 1 ? 'Producto cargado desde inventario.'
+                : (resultados.length ? `Coincidencias: ${resultados.length}` : 'No se encontraron productos.'))
+            : `${resultados.length} productos disponibles.`;
+    }
+
+    filtroProducto.addEventListener('input', aplicarFiltroProductos);
+    aplicarFiltroProductos();
+
     document.getElementById('producto_select').addEventListener('change', function() {
         const selectedOption = this.options[this.selectedIndex];
         const precio = selectedOption.getAttribute('data-precio');
-        const desc = selectedOption.getAttribute('data-desc');
         const costo = selectedOption.getAttribute('data-costo');
 
         document.getElementById('precio_input').value = precio ? parseFloat(precio).toFixed(2) : '';
-        document.getElementById('descripcion_input').value = desc || '';
         document.getElementById('costo_input').value = costo ? parseFloat(costo).toFixed(2) : '0.00';
     });
 
@@ -453,7 +436,7 @@
             cantidad: item.cantidad,
             precio: item.precio,
             costo: item.costo,
-            descripcion: item.descripcion
+            unidad: item.unidad
         }));
 
         document.getElementById('productos_seleccionados').value = JSON.stringify(detallesFinales);
@@ -462,18 +445,6 @@
             alert('{{ t("msg_cot_vacia") }}');
             event.preventDefault();
             return;
-        }
-
-        const estado = document.getElementById('estado').value;
-        const pago = document.getElementById('tipo_pago');
-        pago.classList.remove('is-invalid');
-
-        if (estado === 'Pagada' && !pago.value) {
-            event.preventDefault();
-            event.stopPropagation();
-            alert('{{ t("msg_validar_pago") }}');
-            pago.classList.add('is-invalid');
-            pago.focus();
         }
 
         if (!form.checkValidity()) {

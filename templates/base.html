@@ -35,7 +35,7 @@
                         <i class="fas fa-chart-pie"></i> {{ t('menu_dashboard') }}
                     </a>
                 </li>
-                {% if current_user.rol in ['admin', 'inventario'] %}
+                {% if current_user.rol in ['admin', 'inventario', 'usuario'] %}
                 <li>
                     <a href="{{ url_for('listar_inventario') }}" class="sidebar-link {% if request.endpoint == 'listar_inventario' %}active{% endif %}">
                         <i class="fas fa-boxes-stacked"></i> {{ t('menu_inventario') }}
@@ -63,7 +63,7 @@
                     </a>
                 </li>
                 {% endif %}
-                {% if current_user.rol == 'admin' %}
+                {% if current_user.rol == 'admin' and current_user.id|string == admin_principal_id|string %}
                 <li>
                     <a href="{{ url_for('administrar_usuarios') }}" class="sidebar-link {% if request.endpoint == 'administrar_usuarios' %}active{% endif %}">
                         <i class="fas fa-users-cog"></i> Administrar usuarios

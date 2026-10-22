@@ -37,19 +37,17 @@
             </div>
         </section>
         <section class="product-editor__section">
-            <h3><i class="fas fa-boxes-stacked text-primary me-2"></i>Existencias y empaque</h3>
+            <h3><i class="fas fa-boxes-stacked text-primary me-2"></i>Existencias</h3>
             <div class="row g-3">
-                <div class="col-sm-4"><label class="form-label" for="cantidad">Stock inicial</label><div class="input-group"><input class="form-control" type="number" id="cantidad" name="cantidad" min="0" value="0" required><span class="input-group-text">unid.</span></div></div>
-                <div class="col-sm-4"><label class="form-label" for="unidades_por_caja">Unidades por caja</label><div class="input-group"><input class="form-control" type="number" id="unidades_por_caja" name="unidades_por_caja" min="0" value="0"><span class="input-group-text">unid.</span></div></div>
-                <div class="col-sm-4"><label class="form-label" for="umbral_stock">Avisar cuando queden</label><div class="input-group"><input class="form-control" type="number" id="umbral_stock" name="umbral_stock" min="0" value="10" required><span class="input-group-text">unid.</span></div></div>
+                <div class="col-sm-6"><label class="form-label" for="cantidad">Stock inicial</label><div class="input-group"><input class="form-control" type="number" id="cantidad" name="cantidad" min="0" value="0" required><span class="input-group-text">unid.</span></div></div>
+                <div class="col-sm-6"><label class="form-label" for="umbral_stock">Avisar cuando queden</label><div class="input-group"><input class="form-control" type="number" id="umbral_stock" name="umbral_stock" min="0" value="10" required><span class="input-group-text">unid.</span></div></div>
             </div>
             <div class="product-editor__hint mt-2">El aviso de stock bajo se activa al llegar al mínimo indicado.</div>
         </section>
         <section class="product-editor__section">
-            <h3><i class="fas fa-tags text-primary me-2"></i>Precios de venta</h3>
+            <h3><i class="fas fa-tags text-primary me-2"></i>Precio de venta</h3>
             <div class="row g-3">
-                <div class="col-md-6"><label class="form-label" for="precio_unitario">Precio de venta por caja (S/) <span class="text-danger">*</span></label><div class="input-group"><span class="input-group-text">S/</span><input class="form-control" type="number" id="precio_unitario" name="precio_unitario" min="0" step="0.01" placeholder="0.00" required></div></div>
-                <div class="col-md-6"><label class="form-label" for="precio_unidad_nuevo">Precio de venta por unidad (S/)</label><div class="input-group"><span class="input-group-text">S/</span><input class="form-control" type="number" id="precio_unidad_nuevo" name="precio_unidad_nuevo" min="0" step="0.01" value="0.00"></div></div>
+                <div class="col-md-6"><label class="form-label" for="precio_unitario">Precio de venta por unidad (S/) <span class="text-danger">*</span></label><div class="input-group"><span class="input-group-text">S/</span><input class="form-control" type="number" id="precio_unitario" name="precio_unitario" min="0" step="0.01" placeholder="0.00" required></div></div>
             </div>
             <div class="product-editor__hint mt-2">Estos precios pueden aparecer en la cotización y su PDF. El costo de compra es interno y no se muestra aquí.</div>
         </section>

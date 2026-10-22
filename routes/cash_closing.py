@@ -43,7 +43,7 @@ def obtener_cotizaciones_del_dia(conn, fecha_operativa):
 
     for cot_id, cotizacion in cotizaciones.items():
         cursor.execute('''
-            SELECT COALESCE(i.nombre, cd.descripcion, 'Producto eliminado') AS nombre,
+            SELECT COALESCE(i.nombre, 'Producto eliminado') AS nombre,
                    cd.cantidad, cd.precio_unitario_cotizado,
                    cd.cantidad * cd.precio_unitario_cotizado AS subtotal
             FROM cotizacion_detalles cd

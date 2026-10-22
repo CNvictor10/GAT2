@@ -11,7 +11,8 @@ from lenguajes import obtener_texto
 # --- IMPORTACIONES DE LÓGICA DE BASE DE DATOS ---
 from database import (
     crear_conexion, asegurar_columna_dni_usuarios,
-    asegurar_columna_unidades_por_caja, asegurar_columna_imagen_producto, asegurar_columnas_administracion_usuarios,
+    asegurar_columna_unidades_por_caja, asegurar_columna_unidad_cotizacion,
+    asegurar_columna_imagen_producto, asegurar_columnas_administracion_usuarios,
     asegurar_columnas_razon_social_cotizaciones, asegurar_columnas_folios_y_cierres,
     registrar_pago_cotizacion, crear_cierre_caja,
     obtener_ventas_aprobadas_para_cierre,
@@ -19,6 +20,7 @@ from database import (
 )
 
 asegurar_columna_unidades_por_caja()
+asegurar_columna_unidad_cotizacion()
 asegurar_columna_imagen_producto()
 asegurar_columnas_razon_social_cotizaciones()
 asegurar_columnas_folios_y_cierres()
@@ -32,7 +34,17 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 15 * 1024 * 1024
+app.config['ADMIN_PRINCIPAL_ID'] = int(os.environ.get('GAT_ADMIN_USER_ID', '1'))
+app.jinja_env.globals['admin_principal_id'] = app.config['ADMIN_PRINCIPAL_ID']
 app.secret_key = os.environ.get('GAT_SECRET_KEY') or os.environ.get('SECRET_KEY') or os.urandom(32)
+
+def formato_dinero(valor):
+    try:
+        return f"{float(valor or 0):,.2f}"
+    except (TypeError, ValueError):
+        return "0.00"
+
+app.jinja_env.filters['dinero'] = formato_dinero
 if not os.environ.get('GAT_SECRET_KEY') and not os.environ.get('SECRET_KEY'):
     app.logger.warning('GAT_SECRET_KEY no está configurada; las sesiones se cerrarán al reiniciar la app.')
 
@@ -44,6 +56,19 @@ login_manager.login_view = 'login'
 # ==================================================
 #  FUNCIONES PARA MANEJAR INVENTARIO DESDE BD
 # ==================================================
+
+def precio_producto_unitario(precio_legacy, precio_unidad=0):
+    """Devuelve el precio unitario y usa el precio antiguo como respaldo."""
+    try:
+        unitario = float(precio_unidad or 0)
+    except (TypeError, ValueError):
+        unitario = 0
+    if unitario > 0:
+        return unitario
+    try:
+        return float(precio_legacy or 0)
+    except (TypeError, ValueError):
+        return 0
 
 def obtener_inventario_desde_bd():
     """Obtiene todos los productos desde la base de datos"""
@@ -65,8 +90,8 @@ def obtener_inventario_desde_bd():
                 'nombre_zh': row[3] or '',
                 'descripcion': row[4] or '',
                 'cantidad': row[5] or 0,
-                'precio_unitario': row[6] or 0,
-                'precio_unidad': row[7] or 0,
+            'precio_unitario': precio_producto_unitario(row[6], row[7]),
+            'precio_unidad': precio_producto_unitario(row[6], row[7]),
                 'umbral_stock': row[8] or 5,
                 'costo_adquisicion': row[9] or 0,
                 'imagen': row[10] or ''
@@ -97,8 +122,8 @@ def obtener_producto_por_id_bd(producto_id):
             'nombre_zh': row[3] or '',
             'descripcion': row[4] or '',
             'cantidad': row[5] or 0,
-            'precio_unitario': row[6] or 0,
-            'precio_unidad': row[7] or 0,
+            'precio_unitario': precio_producto_unitario(row[6], row[7]),
+                'precio_unidad': precio_producto_unitario(row[6], row[7]),
             'umbral_stock': row[8] or 5,
             'costo_adquisicion': row[9] or 0,
             'unidades_por_caja': row[10] or 0,
@@ -148,8 +173,8 @@ def buscar_productos_bd(query):
             'nombre_zh': row[3] or '',
             'descripcion': row[4] or '',
             'cantidad': row[5] or 0,
-            'precio_unitario': row[6] or 0,
-            'precio_unidad': row[7] or 0,
+            'precio_unitario': precio_producto_unitario(row[6], row[7]),
+                'precio_unidad': precio_producto_unitario(row[6], row[7]),
             'umbral_stock': row[8] or 5,
             'costo_adquisicion': row[9] or 0,
             'imagen': row[10] or ''
@@ -223,6 +248,6 @@ if __name__ == '__main__':
         print("🔧 Ejecuta: python database.py para crearla")
     
     debug = os.environ.get('GAT_DEBUG', '').strip().lower() in {'1', 'true', 'yes', 'si'}
-    host = os.environ.get('GAT_HOST', '127.0.0.1')
+    host = os.environ.get('GAT_HOST', '0.0.0.0')
     port = int(os.environ.get('GAT_PORT', '5000'))
     app.run(debug=debug, host=host, port=port)

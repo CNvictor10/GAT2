@@ -35,6 +35,50 @@ def listar_cotizaciones():
     
     return render_template('cotizaciones/listar.html', cotizaciones=lista, search_query=search)
 
+@app.route('/cotizaciones/buscar_cliente')
+@role_required('ventas')
+def buscar_cliente_cotizacion():
+    tipo = request.args.get('tipo', '')
+    columna = {'celular': 'cliente_celular', 'ruc': 'cliente_ruc'}.get(tipo)
+    if not columna:
+        return jsonify({'encontrado': False}), 400
+
+    valor = ''.join(caracter for caracter in request.args.get('valor', '') if caracter.isdigit())
+    if len(valor) < 8:
+        return jsonify({'encontrado': False})
+
+    normalizado = (
+        f"replace(replace(replace(replace(replace(replace(COALESCE({columna}, ''), "
+        "' ', ''), '-', ''), '+', ''), '(', ''), ')', ''), '.', '')"
+    )
+    conn = crear_conexion()
+    try:
+        cliente = conn.execute(
+            f"SELECT cliente_nombre, cliente_celular, cliente_direccion, cliente_ruc "
+            f"FROM cotizaciones WHERE {normalizado} = ? ORDER BY id DESC LIMIT 1",
+            (valor,),
+        ).fetchone()
+        if not cliente:
+            return jsonify({'encontrado': False})
+        historial = conn.execute(
+            f"""SELECT id, numero_cotizacion, fecha, estado, total,
+                      COALESCE(observacion_rechazo, '') AS observacion_rechazo
+               FROM cotizaciones WHERE {normalizado} = ?
+               ORDER BY id DESC LIMIT 10""",
+            (valor,),
+        ).fetchall()
+        return jsonify({
+            'encontrado': True,
+            'nombre': cliente[0] or '',
+            'celular': cliente[1] or '',
+            'direccion': cliente[2] or '',
+            'ruc': cliente[3] or '',
+            'historial': [dict(item) for item in historial],
+        })
+    finally:
+        conn.close()
+
+
 @app.route('/aprobar_cotizacion/<int:cotizacion_id>', methods=['POST'])
 @role_required('ventas', 'caja', 'usuario')
 def route_aprobar_cotizacion(cotizacion_id):
@@ -59,7 +103,6 @@ def listar_pagos():
         JOIN usuarios u ON u.id=c.usuario_id
         LEFT JOIN movimientos_caja mc ON mc.cotizacion_id=c.id
         WHERE c.estado IN ('Pendiente', 'Parcial')
-          AND date(c.fecha) < date('now', 'localtime')
         GROUP BY c.id
         ORDER BY c.fecha ASC, c.id ASC
     ''').fetchall()
@@ -76,10 +119,39 @@ def listar_pagos():
 @app.route('/cotizaciones/nueva', methods=['GET', 'POST'])
 @role_required('ventas')
 def nueva_cotizacion():
+    def mostrar_formulario(datos=None, productos_iniciales=None):
+        inventario = obtener_inventario_desde_bd()
+        productos_inventario = [(p['id'], p['nombre'], p['precio_unitario']) for p in inventario]
+        conn_formulario = crear_conexion()
+        razones = conn_formulario.execute(
+            'SELECT id, nombre, ruc FROM razones_sociales WHERE activa=1 ORDER BY nombre COLLATE NOCASE'
+        ).fetchall()
+        conn_formulario.close()
+        return render_template(
+            'cotizaciones/nueva.html', productos_inventario=productos_inventario,
+            razones_sociales=razones, datos_formulario=datos or {},
+            productos_iniciales=productos_iniciales or [],
+            fecha_hoy=datetime.date.today().isoformat(),
+        )
+
     if request.method == 'POST':
+        datos_formulario = {
+            campo: request.form.get(campo, '')
+            for campo in ('razon_social_id', 'cliente_nombre', 'cliente_celular', 'cliente_direccion', 'cliente_ruc', 'fecha')
+        }
+        try:
+            productos_iniciales = json.loads(request.form.get('productos_seleccionados', '[]'))
+            if not isinstance(productos_iniciales, list):
+                productos_iniciales = []
+        except (TypeError, json.JSONDecodeError):
+            productos_iniciales = []
+
         conn = crear_conexion()
         cursor = conn.cursor()
         try:
+            fecha_elegida = datetime.datetime.strptime(datos_formulario.get('fecha', ''), '%Y-%m-%d').date()
+            hora_actual = datetime.datetime.now().strftime('%H:%M:%S')
+            fecha = f'{fecha_elegida.isoformat()} {hora_actual}'
             razon_id = request.form.get('razon_social_id', type=int)
             razon = cursor.execute(
                 'SELECT id, nombre, ruc, telefono, medios_pago FROM razones_sociales WHERE id=? AND activa=1',
@@ -87,19 +159,20 @@ def nueva_cotizacion():
             ).fetchone()
             if not razon:
                 flash('Selecciona una razón social activa antes de cotizar.', 'danger')
-                return redirect(url_for('nueva_cotizacion'))
+                return mostrar_formulario(datos_formulario, productos_iniciales)
 
             cliente = request.form['cliente_nombre']
             celular = request.form.get('cliente_celular')
             direccion = request.form.get('cliente_direccion', '').strip()
             ruc = request.form.get('cliente_ruc')
-            pago = request.form['tipo_pago']
+            # Las cotizaciones se crean pendientes; estado y pagos se gestionan exclusivamente desde Pagos.
+            pago = ''
             estado = 'Pendiente'
-            prods = json.loads(request.form.get('productos_seleccionados', '[]'))
+            prods = productos_iniciales
 
             if not prods:
                 flash('Agregue productos', 'danger')
-                return redirect(url_for('nueva_cotizacion'))
+                return mostrar_formulario(datos_formulario, productos_iniciales)
 
             inventario = obtener_inventario_desde_bd()
             dict_inv = {p['id']: p for p in inventario}
@@ -116,6 +189,9 @@ def nueva_cotizacion():
                 stock_actual = producto['cantidad']
                 costo_adq = producto.get('costo_adquisicion', 0)
                 p_nombre = producto['nombre']
+                unidad = str(p.get('unidad') or 'und').strip().lower()
+                if unidad not in ('caja', 'und', 'paquete', 'par'):
+                    raise Exception('Selecciona una unidad válida para cada producto.')
                 
                 if estado in ('Aprobada', 'Pagada') and int(p['cantidad']) > stock_actual:
                     raise Exception(f"Stock insuficiente: {p_nombre}")
@@ -125,12 +201,11 @@ def nueva_cotizacion():
                 items_listos.append({
                     'id': pid, 
                     'cant': int(p['cantidad']), 
-                    'desc': p['descripcion'],
+                    'unidad': unidad,
                     'precio': float(p['precio']), 
                     'costo': costo_adq or 0
                 })
 
-            fecha = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             conn.execute('BEGIN IMMEDIATE')
             periodo_folio = fecha[:7].replace('-', '')
             ultimo_folio = cursor.execute(
@@ -153,8 +228,8 @@ def nueva_cotizacion():
             costo_total = 0
             for it in items_listos:
                 cursor.execute(
-                    "INSERT INTO cotizacion_detalles (cotizacion_id, producto_id, cantidad, descripcion, precio_unitario_cotizado, costo_unitario) VALUES (?,?,?,?,?,?)",
-                    (cot_id, it['id'], it['cant'], it['desc'], it['precio'], it['costo']))
+                    "INSERT INTO cotizacion_detalles (cotizacion_id, producto_id, cantidad, descripcion, precio_unitario_cotizado, costo_unitario, unidad) VALUES (?,?,?,?,?,?,?)",
+                    (cot_id, it['id'], it['cant'], '', it['precio'], it['costo'], it['unidad']))
                 
                 if estado in ('Aprobada', 'Pagada'):
                     cursor.execute("UPDATE inventario SET cantidad = cantidad - ? WHERE id = ?", (it['cant'], it['id']))
@@ -172,19 +247,10 @@ def nueva_cotizacion():
         except Exception as e:
             conn.rollback()
             flash(f'Error: {e}', 'danger')
-            return redirect(url_for('nueva_cotizacion'))
+            return mostrar_formulario(datos_formulario, productos_iniciales)
         finally:
             conn.close()
-    else:
-        inventario = obtener_inventario_desde_bd()
-        productos_inventario = [(p['id'], p['nombre'], p['precio_unitario'], p.get('descripcion', '')) 
-                               for p in inventario]
-        conn = crear_conexion()
-        razones = conn.execute(
-            'SELECT id, nombre, ruc FROM razones_sociales WHERE activa=1 ORDER BY nombre COLLATE NOCASE'
-        ).fetchall()
-        conn.close()
-        return render_template('cotizaciones/nueva.html', productos_inventario=productos_inventario, razones_sociales=razones)
+    return mostrar_formulario()
 
 @app.route('/cotizaciones/detalle/<int:id>')
 @role_required('ventas')
@@ -195,7 +261,8 @@ def detalle_cotizacion(id):
                       c.fecha, c.total, c.estado, u.nombre, c.tipo_pago,
                       COALESCE(c.razon_social_nombre, ''), COALESCE(c.razon_social_ruc, ''),
                       COALESCE(c.razon_social_telefono, ''), COALESCE(c.cliente_direccion, ''),
-                      COALESCE((SELECT SUM(mc.ingreso_total) FROM movimientos_caja mc WHERE mc.cotizacion_id=c.id), 0)
+                      COALESCE((SELECT SUM(mc.ingreso_total) FROM movimientos_caja mc WHERE mc.cotizacion_id=c.id), 0),
+                      COALESCE(c.observacion_rechazo, ''), c.razon_social_id
                       FROM cotizaciones c JOIN usuarios u ON c.usuario_id = u.id WHERE c.id = ?''', (id,))
     row = cursor.fetchone()
 
@@ -208,30 +275,51 @@ def detalle_cotizacion(id):
     # cotizaciones sin pago. Después de guardar se muestra la ficha actualizada.
     cot = list(row)
     try:
+        fecha_iso = datetime.datetime.strptime(str(cot[5]).split('.')[0], '%Y-%m-%d %H:%M:%S').date().isoformat()
+    except Exception:
+        fecha_iso = datetime.date.today().isoformat()
+    try:
         cot[5] = datetime.datetime.strptime(str(cot[5]).split('.')[0], '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%Y %H:%M')
     except Exception:
         pass
 
     cursor.execute('''
-        SELECT cd.cantidad, cd.producto_id, cd.descripcion, cd.precio_unitario_cotizado,
-               COALESCE(i.nombre, 'Producto #' || cd.producto_id)
+        SELECT cd.cantidad, cd.producto_id, cd.precio_unitario_cotizado,
+               COALESCE(i.nombre, 'Producto #' || cd.producto_id),
+               COALESCE(cd.costo_unitario, i.costo_adquisicion, 0), COALESCE(cd.unidad, 'und')
         FROM cotizacion_detalles cd
         LEFT JOIN inventario i ON cd.producto_id = i.id
         WHERE cd.cotizacion_id = ?
     ''', (id,))
     detalles_bd = cursor.fetchall()
-    conn.close()
 
     detalles = []
     for item in detalles_bd:
         detalles.append({
             'cantidad': item[0],
-            'nombre': item[4],
-            'descripcion': item[2] or '',
-            'precio': item[3]
+            'producto_id': item[1],
+            'nombre': item[3],
+            'precio': item[2],
+            'costo': item[4] or 0,
+            'unidad': item[5] or 'und'
         })
 
-    return render_template('cotizaciones/detalle.html', cotizacion=cot, detalles=detalles)
+    razones = conn.execute(
+        'SELECT id, nombre, ruc, activa FROM razones_sociales WHERE activa=1 OR id=? ORDER BY nombre COLLATE NOCASE',
+        (cot[16],),
+    ).fetchall()
+    inventario = obtener_inventario_desde_bd()
+    productos_inventario = [
+        (p['id'], p['nombre'], p['precio_unitario'], p.get('costo_adquisicion', 0))
+        for p in inventario
+    ]
+    conn.close()
+
+    return render_template(
+        'cotizaciones/detalle.html', cotizacion=cot, detalles=detalles,
+        razones_sociales=razones, productos_inventario=productos_inventario, fecha_iso=fecha_iso,
+        puede_editar=cot[7] in ('Pendiente', 'Rechazado', 'Rechazada'),
+    )
 
 @app.route('/cotizaciones/editar/<int:id>', methods=['GET', 'POST'])
 @role_required('ventas')
@@ -240,7 +328,7 @@ def editar_cotizacion(id):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
-    cursor.execute("SELECT estado, total, razon_social_id FROM cotizaciones WHERE id = ?", (id,))
+    cursor.execute("SELECT estado, total, razon_social_id, fecha FROM cotizaciones WHERE id = ?", (id,))
     row_ant = cursor.fetchone()
     if not row_ant:
         conn.close()
@@ -258,8 +346,16 @@ def editar_cotizacion(id):
             celular = request.form.get('cliente_celular')
             direccion = request.form.get('cliente_direccion', '').strip()
             ruc = request.form.get('cliente_ruc')
-            nuevo_estado = estado_anterior if estado_anterior in ('Aprobada', 'Pagada') else 'Pendiente'
-            tipo_pago = request.form['tipo_pago']
+            fecha_texto = request.form.get('fecha', '').strip()
+            if fecha_texto:
+                fecha_elegida = datetime.datetime.strptime(fecha_texto, '%Y-%m-%d').date()
+                try:
+                    hora_guardada = datetime.datetime.fromisoformat(str(row_ant['fecha']).split('.')[0]).strftime('%H:%M:%S')
+                except (TypeError, ValueError):
+                    hora_guardada = datetime.datetime.now().strftime('%H:%M:%S')
+                fecha = f'{fecha_elegida.isoformat()} {hora_guardada}'
+            else:
+                fecha = row_ant['fecha']
             razon_id = request.form.get('razon_social_id', type=int)
             razon = conn.execute(
                 'SELECT id, nombre, ruc, telefono, medios_pago FROM razones_sociales '
@@ -278,35 +374,16 @@ def editar_cotizacion(id):
             inventario = obtener_inventario_desde_bd()
             dict_stock = {p['id']: p for p in inventario}
             
-            if nuevo_estado in ('Aprobada', 'Pagada'):
-                if estado_anterior in ('Aprobada', 'Pagada'):
-                    cursor.execute("SELECT producto_id, cantidad FROM cotizacion_detalles WHERE cotizacion_id=?", (id,))
-                    for pid, cant in cursor.fetchall():
-                        if pid in dict_stock:
-                            dict_stock[pid]['cantidad'] += cant
-
-                for p in nuevos_productos:
-                    pid = int(p['id'])
-                    if pid in dict_stock and int(p['cantidad']) > dict_stock[pid]['cantidad']:
-                        raise Exception(f"Stock insuficiente para {dict_stock[pid]['nombre']}")
-
             cursor.execute("""
-                UPDATE cotizaciones SET cliente_nombre=?, cliente_celular=?, cliente_direccion=?, cliente_email=NULL,
-                cliente_ruc=?, estado=?, tipo_pago=?, razon_social_id=?, razon_social_nombre=?,
+                UPDATE cotizaciones SET cliente_nombre=?, cliente_celular=?, cliente_direccion=?, cliente_email=NULL, fecha=?,
+                cliente_ruc=?, razon_social_id=?, razon_social_nombre=?,
                 razon_social_ruc=?, razon_social_telefono=?, razon_social_medios_pago=? WHERE id=?
-            """, (cliente, celular, direccion, ruc, nuevo_estado, tipo_pago, razon['id'],
-                  razon['nombre'], razon['ruc'], razon['telefono'], razon['medios_pago'], id))
-
-            if estado_anterior in ('Aprobada', 'Pagada'):
-                cursor.execute("SELECT producto_id, cantidad FROM cotizacion_detalles WHERE cotizacion_id=?", (id,))
-                for pid, cant in cursor.fetchall():
-                    cursor.execute("UPDATE inventario SET cantidad = cantidad + ? WHERE id = ?", (cant, pid))
-                cursor.execute("DELETE FROM movimientos_caja WHERE cotizacion_id=?", (id,))
+            """, (cliente, celular, direccion, fecha, ruc, razon['id'], razon['nombre'],
+                  razon['ruc'], razon['telefono'], razon['medios_pago'], id))
 
             cursor.execute("DELETE FROM cotizacion_detalles WHERE cotizacion_id=?", (id,))
 
             total_venta = 0
-            costo_total_venta = 0
 
             for p in nuevos_productos:
                 pid = int(p['id'])
@@ -315,30 +392,18 @@ def editar_cotizacion(id):
                 costo_unit = float(p.get('costo', dict_stock.get(pid, {}).get('costo_adquisicion', 0)) or 0)
                 if precio <= 0 or costo_unit < 0:
                     raise Exception('El precio debe ser mayor que cero y el costo no puede ser negativo.')
-                desc = p.get('descripcion', '')
+                unidad = str(p.get('unidad') or 'und').strip().lower()
+                if unidad not in ('caja', 'und', 'paquete', 'par'):
+                    raise Exception('Selecciona una unidad válida para cada producto.')
 
                 total_venta += precio * cant
-                costo_total_venta += costo_unit * cant
 
                 cursor.execute("""
-                    INSERT INTO cotizacion_detalles (cotizacion_id, producto_id, cantidad, descripcion, precio_unitario_cotizado, costo_unitario)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (id, pid, cant, desc, precio, costo_unit))
+                    INSERT INTO cotizacion_detalles (cotizacion_id, producto_id, cantidad, descripcion, precio_unitario_cotizado, costo_unitario, unidad)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (id, pid, cant, '', precio, costo_unit, unidad))
 
             cursor.execute("UPDATE cotizaciones SET total=? WHERE id=?", (total_venta, id))
-
-            if nuevo_estado in ('Aprobada', 'Pagada'):
-                for p in nuevos_productos:
-                    cursor.execute("UPDATE inventario SET cantidad = cantidad - ? WHERE id = ?", (int(p['cantidad']), int(p['id'])))
-
-                fecha_hoy = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                cursor.execute("""
-                    INSERT INTO movimientos_caja (cotizacion_id, fecha, ingreso_total, costo_total, tipo_pago)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (id, fecha_hoy, total_venta, costo_total_venta, tipo_pago))
-                cursor.execute("UPDATE cotizaciones SET fecha_aprobacion = ? WHERE id = ?", (fecha_hoy, id))
-            else:
-                cursor.execute("UPDATE cotizaciones SET fecha_aprobacion = NULL WHERE id = ?", (id,))
 
             conn.commit()
             flash('Cotización actualizada correctamente.', 'success')
@@ -349,7 +414,8 @@ def editar_cotizacion(id):
         except Exception as e:
             conn.rollback()
             flash(f'Error: {e}', 'danger')
-            return redirect(url_for('editar_cotizacion', id=id))
+            destino = 'detalle_cotizacion' if request.form.get('origen_detalle') else 'editar_cotizacion'
+            return redirect(url_for(destino, id=id))
         finally:
             conn.close()
 
@@ -362,9 +428,9 @@ def editar_cotizacion(id):
     ).fetchall()
     
     cursor.execute('''
-        SELECT cd.producto_id, cd.descripcion, cd.cantidad, cd.precio_unitario_cotizado,
+        SELECT cd.producto_id, cd.cantidad, cd.precio_unitario_cotizado,
                COALESCE(i.nombre, 'Producto #' || cd.producto_id),
-               COALESCE(cd.costo_unitario, i.costo_adquisicion, 0)
+               COALESCE(cd.costo_unitario, i.costo_adquisicion, 0), COALESCE(cd.unidad, 'und')
         FROM cotizacion_detalles cd
         LEFT JOIN inventario i ON cd.producto_id = i.id
         WHERE cd.cotizacion_id = ?
@@ -375,15 +441,15 @@ def editar_cotizacion(id):
     for item in detalles_bd:
         detalles.append({
             'producto_id': item[0],
-            'nombre_producto': item[4],
-            'descripcion': item[1] or '',
-            'cantidad': item[2],
-            'precio_unitario_cotizado': item[3],
-            'costo_unitario': item[5]
+            'nombre_producto': item[3],
+            'cantidad': item[1],
+            'precio_unitario_cotizado': item[2],
+            'costo_unitario': item[4],
+            'unidad': item[5] or 'und'
         })
     
     inventario = obtener_inventario_desde_bd()
-    productos_inventario = [(p['id'], p['nombre'], p['precio_unitario'], p.get('descripcion', ''), p.get('costo_adquisicion', 0)) for p in inventario]
+    productos_inventario = [(p['id'], p['nombre'], p['precio_unitario'], p.get('costo_adquisicion', 0)) for p in inventario]
     
     conn.close()
     return render_template('cotizaciones/editar.html', 
@@ -419,35 +485,46 @@ def eliminar_cotizacion(id):
         conn.close()
     return redirect(url_for('listar_cotizaciones'))
 
-@app.route('/cotizaciones/rechazar/<int:id>')
-@role_required('ventas')
+@app.route('/cotizaciones/rechazar/<int:id>', methods=['POST'])
+@role_required('ventas', 'caja', 'usuario')
 def rechazar_cotizacion(id):
+    observacion = request.form.get('observacion_rechazo', '').strip()
+    if not observacion:
+        flash('Escribe una observacion para registrar el rechazo.', 'danger')
+        return redirect(url_for('listar_pagos'))
+    if len(observacion) > 1000:
+        flash('La observacion no puede superar 1000 caracteres.', 'danger')
+        return redirect(url_for('listar_pagos'))
+
     conn = crear_conexion()
     try:
-        conn.execute("BEGIN TRANSACTION;")
+        conn.execute('BEGIN TRANSACTION;')
         cursor = conn.cursor()
-        cursor.execute("SELECT estado FROM cotizaciones WHERE id=?", (id,))
-        estado_ant = cursor.fetchone()[0]
+        cotizacion = cursor.execute(
+            'SELECT estado FROM cotizaciones WHERE id=?', (id,)
+        ).fetchone()
+        abonos = cursor.execute(
+            'SELECT COALESCE(SUM(ingreso_total), 0) FROM movimientos_caja WHERE cotizacion_id=?',
+            (id,),
+        ).fetchone()[0]
 
-        if estado_ant != 'Pendiente':
+        if not cotizacion or cotizacion['estado'] != 'Pendiente' or (abonos or 0) > 0:
             conn.rollback()
-            flash('Solo se pueden rechazar cotizaciones sin pagos registrados.', 'warning')
-            return redirect(url_for('listar_cotizaciones'))
+            flash('Solo se pueden rechazar cotizaciones pendientes y sin abonos.', 'warning')
+            return redirect(url_for('listar_pagos'))
 
-        if estado_ant in ('Aprobada', 'Pagada'):
-            cursor.execute("SELECT producto_id, cantidad FROM cotizacion_detalles WHERE cotizacion_id=?", (id,))
-            for pid, cant in cursor.fetchall():
-                cursor.execute("UPDATE inventario SET cantidad = cantidad + ? WHERE id = ?", (cant, pid))
-            cursor.execute("DELETE FROM movimientos_caja WHERE cotizacion_id=?", (id,))
-
-        cursor.execute("UPDATE cotizaciones SET estado='Rechazado' WHERE id=?", (id,))
+        cursor.execute(
+            "UPDATE cotizaciones SET estado='Rechazado', observacion_rechazo=? WHERE id=?",
+            (observacion, id),
+        )
         conn.commit()
-        flash('Cotización rechazada', 'info')
+        flash('Rechazo y observacion registrados.', 'info')
     except Exception as e:
         conn.rollback()
         flash(f'Error: {e}', 'danger')
-    conn.close()
-    return redirect(url_for('listar_cotizaciones'))
+    finally:
+        conn.close()
+    return redirect(url_for('listar_pagos'))
 
 @app.route('/cotizaciones/exportar_pdf/<int:id>')
 @role_required('ventas')
@@ -485,8 +562,8 @@ def exportar_cotizacion_pdf(id):
     }
 
     cursor.execute('''
-        SELECT cd.cantidad, cd.producto_id, cd.descripcion, cd.precio_unitario_cotizado,
-               COALESCE(i.nombre, 'Producto #' || cd.producto_id)
+        SELECT cd.cantidad, cd.producto_id, cd.precio_unitario_cotizado,
+               COALESCE(i.nombre, 'Producto #' || cd.producto_id), COALESCE(cd.unidad, 'und')
         FROM cotizacion_detalles cd
         LEFT JOIN inventario i ON cd.producto_id = i.id
         WHERE cd.cotizacion_id = ?
@@ -498,9 +575,9 @@ def exportar_cotizacion_pdf(id):
     for item in detalles_bd:
         detalles.append({
             'cantidad': item[0],
-            'nombre': item[4],
-            'descripcion': item[2] or '',
-            'precio': item[3]
+            'nombre': item[3],
+            'precio': item[2],
+            'unidad': item[4] or 'und'
         })
 
     try:
@@ -551,7 +628,7 @@ def exportar_cotizacion_pdf(id):
         story.append(Paragraph(info_line, styles['Normal']))
         story.append(Spacer(1, 2))
 
-        data = [['#', 'Producto', 'Descripción', 'Cant', 'P. Unit', 'Subtotal']]
+        data = [['#', 'Producto', 'Unidad', 'Cant', 'P. Unit', 'Subtotal']]
         total_acumulado = 0
 
         if not detalles:
@@ -560,20 +637,19 @@ def exportar_cotizacion_pdf(id):
             for i, item in enumerate(detalles, 1):
                 cant = item['cantidad']
                 nombre = item['nombre']
-                desc = item['descripcion'] or ''
                 precio = item['precio']
                 subtotal = cant * precio
                 total_acumulado += subtotal
                 data.append([
                     str(i),
                     Paragraph(f"<b>{nombre}</b>", styles['TableData']),
-                    Paragraph(desc[:50] if desc else '', styles['TableData']),
+                    item.get('unidad') or 'und',
                     str(cant),
-                    f"S/. {precio:.2f}",
-                    f"S/. {subtotal:.2f}"
+                    f"S/ {precio:,.2f}",
+                    f"S/ {subtotal:,.2f}"
                 ])
 
-        table = Table(data, colWidths=[30, 110, 150, 40, 80, 80])
+        table = Table(data, colWidths=[30, 150, 55, 40, 85, 130])
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -586,7 +662,7 @@ def exportar_cotizacion_pdf(id):
 
         total_display = total_acumulado if detalles else 0
         total_table = Table(
-            [[Paragraph(f"<b>TOTAL: S/. {total_display:.2f}</b>", styles['RightAligned'])]],
+            [[Paragraph(f"<b>TOTAL: S/ {total_display:,.2f}</b>", styles['RightAligned'])]],
             colWidths=[490]
         )
         total_table.setStyle(TableStyle([

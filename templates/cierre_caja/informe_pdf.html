@@ -228,19 +228,19 @@
                 <table class="data-table">
                     <tr>
                         <th>{{ t('caja_apertura') }}</th>
-                        <td class="amount">S/ {{ "%.2f"|format(cierre.monto_apertura) }}</td>
+                        <td class="amount">S/ {{ (cierre.monto_apertura)|dinero }}</td>
                     </tr>
                     <tr>
                         <th>(+) {{ t('caja_ingresos') }}</th>
-                        <td class="amount text-success">S/ {{ "%.2f"|format(cierre.ingresos_extra) }}</td>
+                        <td class="amount text-success">S/ {{ (cierre.ingresos_extra)|dinero }}</td>
                     </tr>
                     <tr>
                         <th>(-) {{ t('caja_egresos') }}</th>
-                        <td class="amount text-danger">S/ {{ "%.2f"|format(cierre.egresos) }}</td>
+                        <td class="amount text-danger">S/ {{ (cierre.egresos)|dinero }}</td>
                     </tr>
                     <tr style="background-color: #fff3cd;">
                         <th>(=) {{ t('caja_teorico') }}</th>
-                        <td class="amount">S/ {{ "%.2f"|format(cierre.efectivo_teorico_final) }}</td>
+                        <td class="amount">S/ {{ (cierre.efectivo_teorico_final)|dinero }}</td>
                     </tr>
                 </table>
             </td>
@@ -252,15 +252,15 @@
                 <table class="data-table">
                     <tr>
                         <th>{{ t('caja_real') }}</th>
-                        <td class="amount" style="font-size: 12px;">S/ {{ "%.2f"|format(cierre.efectivo_en_caja) }}</td>
+                        <td class="amount" style="font-size: 12px;">S/ {{ (cierre.efectivo_en_caja)|dinero }}</td>
                     </tr>
                     <tr>
                         <th>{{ t('caja_diferencia') }}</th>
                         <td class="amount">
                             {% if cierre.diferencia < -0.01 %}
-                                <span class="badge-danger">{{ t('pdf_faltante') }}: {{ "%.2f"|format(cierre.diferencia) }}</span>
+                                <span class="badge-danger">{{ t('pdf_faltante') }}: {{ (cierre.diferencia)|dinero }}</span>
                             {% elif cierre.diferencia > 0.01 %}
-                                <span class="badge-success">{{ t('pdf_sobrante') }}: {{ "%.2f"|format(cierre.diferencia) }}</span>
+                                <span class="badge-success">{{ t('pdf_sobrante') }}: {{ (cierre.diferencia)|dinero }}</span>
                             {% else %}
                                 <span style="color:#198754;">{{ t('pdf_ok') }} (0.00)</span>
                             {% endif %}
@@ -269,7 +269,7 @@
                 </table>
 
                 <div class="total-box">
-                    {{ t('caja_ventas') }}: S/ {{ "%.2f"|format(cierre.total_ventas) }}
+                    {{ t('caja_ventas') }}: S/ {{ (cierre.total_ventas)|dinero }}
                 </div>
             </td>
         </tr>
@@ -287,14 +287,14 @@
         <tbody>
             <tr>
                 <td><strong>Efectivo ({{ t('caja_ventas') }})</strong></td>
-                <td class="amount">S/ {{ "%.2f"|format(cierre.efectivo_teorico) }}</td>
+                <td class="amount">S/ {{ (cierre.efectivo_teorico)|dinero }}</td>
                 <td style="color: #999; font-style: italic; font-size: 9px;">{{ t('pdf_moneda_fisica') }}</td>
             </tr>
             {% for medio, monto in cierre.desglose_pagos.items() %}
                 {% if monto > 0 %}
                 <tr>
                     <td>{{ medio }}</td>
-                    <td class="amount">S/ {{ "%.2f"|format(monto) }}</td>
+                    <td class="amount">S/ {{ (monto)|dinero }}</td>
                     <td></td>
                 </tr>
                 {% endif %}

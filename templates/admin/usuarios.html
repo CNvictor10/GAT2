@@ -15,7 +15,7 @@
     </div>
 
     <div class="alert alert-info" role="note">
-        Cada trabajador solo puede entrar al área de su rol. Las cuentas nuevas y los restablecimientos usan una clave temporal que debe cambiarse al iniciar sesión.
+        Las cuentas generales pueden usar todas las ?reas operativas. Solo V?ctor puede administrar usuarios y razones sociales.
     </div>
 
     <div class="card border-0 shadow-sm mb-4">
@@ -30,16 +30,7 @@
                     <label class="form-label" for="nuevo-dni">DNI</label>
                     <input class="form-control" id="nuevo-dni" name="dni" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" required>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label" for="nuevo-rol">Área / rol</label>
-                    <select class="form-select" id="nuevo-rol" name="rol">
-                        <option value="trabajador">Trabajador sin área asignada</option>
-                        <option value="inventario">Inventario / almacén</option>
-                        <option value="ventas">Ventas / cotizaciones</option>
-                        <option value="caja">Caja / cierres</option>
-                        <option value="admin">Administrador</option>
-                    </select>
-                </div>
+                <div class="col-md-3 d-flex align-items-center"><span class="badge text-bg-secondary">Usuario general</span></div>
                 <div class="col-md-2 d-grid">
                     <button class="btn btn-primary" type="submit">Crear cuenta</button>
                 </div>
@@ -68,16 +59,11 @@
                     </td>
                     <td>{{ usuario['dni'] or usuario['email'] or '—' }}</td>
                     <td>
-                        <form method="POST" action="{{ url_for('cambiar_rol_usuario', usuario_id=usuario['id']) }}" class="d-flex gap-2">
-                            <select name="rol" class="form-select form-select-sm" aria-label="Rol de {{ usuario['nombre'] }}">
-                                <option value="trabajador" {% if usuario['rol'] in ['usuario', 'trabajador'] %}selected{% endif %}>Trabajador general</option>
-                                <option value="inventario" {% if usuario['rol'] == 'inventario' %}selected{% endif %}>Inventario / almacén</option>
-                                <option value="ventas" {% if usuario['rol'] == 'ventas' %}selected{% endif %}>Ventas / cotizaciones</option>
-                                <option value="caja" {% if usuario['rol'] == 'caja' %}selected{% endif %}>Caja / cierres</option>
-                                <option value="admin" {% if usuario['rol'] == 'admin' %}selected{% endif %}>Administrador</option>
-                            </select>
-                            <button class="btn btn-sm btn-outline-primary" type="submit">Guardar</button>
-                        </form>
+                        {% if usuario['id']|string == admin_principal_id|string and usuario['rol'] == 'admin' %}
+                            <span class="badge text-bg-primary">Administrador principal</span>
+                        {% else %}
+                            <span class="badge text-bg-secondary">Usuario general</span>
+                        {% endif %}
                     </td>
                     <td>
                         {% if usuario['activo'] %}<span class="badge text-bg-success">Activa</span>

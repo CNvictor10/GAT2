@@ -6,7 +6,7 @@ import re
 from app import *  # noqa: F401,F403
 from routes.auth import admin_required
 
-ROLES = {'admin', 'inventario', 'ventas', 'caja', 'trabajador'}
+ROLES = {'usuario'}
 
 
 @app.route('/admin/usuarios')
@@ -141,7 +141,7 @@ def cambiar_rol_usuario(usuario_id):
 def crear_usuario_trabajador():
     nombre = request.form.get('nombre', '').strip()
     dni = request.form.get('dni', '').strip()
-    rol = request.form.get('rol', 'trabajador')
+    rol = 'usuario'
     if not nombre or not re.fullmatch(r'\d{8}', dni):
         flash('Ingresa el nombre y un DNI válido de 8 dígitos.', 'danger')
         return redirect(url_for('administrar_usuarios'))

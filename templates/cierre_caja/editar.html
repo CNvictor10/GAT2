@@ -6,8 +6,7 @@
 <div class="container mt-4">
     <h2 class="mb-4">✏️ {{ t('btn_editar') }} {{ t('caja_titulo') }}</h2>
 
-    <form action="{{ url_for('guardar_edicion_cierre_caja') }}" method="POST">
-        <input type="hidden" name="id" value="{{ cierre.id }}">
+    <form action="{{ url_for('editar_cierre_caja', id=cierre.id) }}" method="POST">
 
         <div class="mb-3">
             <label for="fecha" class="form-label">{{ t('cot_col_fecha') }}</label>
@@ -128,14 +127,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const cierreTotal = efectivoFisico + otrosMedios;
             const diferenciaTotal = cierreTotal - totalVentas;
 
-            DOM.efectivoTeoricoFinalDisplay.value = `S/ ${efectivoTeoricoFinal.toFixed(2)}`;
+            DOM.efectivoTeoricoFinalDisplay.value = `S/ ${formatCurrency(efectivoTeoricoFinal)}`;
             DOM.efectivoTeoricoFinalHidden.value = efectivoTeoricoFinal.toFixed(2);
 
-            DOM.diferenciaInput.value = diferenciaEfectivo.toFixed(2);
+            DOM.diferenciaInput.value = `S/ ${formatCurrency(diferenciaEfectivo)}`;
             DOM.diferenciaHidden.value = diferenciaEfectivo.toFixed(2);
             aplicarColores(DOM.diferenciaInput, diferenciaEfectivo);
 
-            DOM.diferenciaTotalInput.value = diferenciaTotal.toFixed(2);
+            DOM.diferenciaTotalInput.value = `S/ ${formatCurrency(diferenciaTotal)}`;
             DOM.diferenciaTotalHidden.value = diferenciaTotal.toFixed(2);
             aplicarColores(DOM.diferenciaTotalInput, diferenciaTotal);
 

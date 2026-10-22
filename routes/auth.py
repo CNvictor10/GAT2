@@ -44,7 +44,12 @@ def admin_required(view):
     @wraps(view)
     @flask_login.login_required
     def wrapped(*args, **kwargs):
-        if getattr(flask_login.current_user, 'rol', None) != 'admin':
+        es_administrador = (
+            getattr(flask_login.current_user, 'rol', None) == 'admin'
+            and str(getattr(flask_login.current_user, 'id', ''))
+            == str(app.config.get('ADMIN_PRINCIPAL_ID', 1))
+        )
+        if not es_administrador:
             abort(403)
         return view(*args, **kwargs)
 
@@ -59,7 +64,13 @@ def role_required(*roles):
         @wraps(view)
         @flask_login.login_required
         def wrapped(*args, **kwargs):
-            if getattr(flask_login.current_user, 'rol', None) not in {'admin', *roles}:
+            rol = getattr(flask_login.current_user, 'rol', None)
+            es_administrador = (
+                rol == 'admin'
+                and str(getattr(flask_login.current_user, 'id', ''))
+                == str(app.config.get('ADMIN_PRINCIPAL_ID', 1))
+            )
+            if not es_administrador and rol != 'usuario' and rol not in roles:
                 abort(403)
             return view(*args, **kwargs)
         return wrapped

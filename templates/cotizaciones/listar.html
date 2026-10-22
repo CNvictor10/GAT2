@@ -36,7 +36,7 @@
                 <tr>
                     <td class="quote-number">#{{ cotizacion[0] }}</td><td class="quote-client">{{ cotizacion[1] }}</td>
                     <td>{{ cotizacion[7] or 'Sin asignar' }}</td><td>{{ cotizacion[2] }}</td>
-                    <td class="text-end fw-semibold">S/ {{ '%.2f'|format(cotizacion[3]) }}</td>
+                    <td class="text-end fw-semibold">S/ {{ cotizacion[3]|dinero }}</td>
                     <td>
                         {% set estado = cotizacion[4] %}
                         {% if estado in ['Aprobada', 'Pagada'] %}<span class="badge text-bg-success">Pagada</span>

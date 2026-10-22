@@ -55,7 +55,7 @@ def cargar_inventario_desde_excel(ruta=None):
                     except:
                         cantidad_caja = 0
                 
-                # El sistema maneja precio por caja y precio por unidad por separado.
+                # El sistema guarda y cotiza un solo precio por unidad.
                 precio_venta_unidad = 0
                 if pd.notna(row.get('P. Venta Unit (S/)')):
                     try:
@@ -69,8 +69,8 @@ def cargar_inventario_desde_excel(ruta=None):
                         precio_venta_caja = float(row['P. Caja Venta (S/)'])
                     except:
                         pass
-                if precio_venta_caja <= 0:
-                    precio_venta_caja = precio_venta_unidad * cantidad_caja
+                if precio_venta_unidad <= 0 and precio_venta_caja > 0:
+                    precio_venta_unidad = precio_venta_caja / cantidad_caja if cantidad_caja > 0 else precio_venta_caja
                 
                 precio_compra_caja = 0
                 if pd.notna(row.get('P. Caja Compra (S/)')):
@@ -85,8 +85,8 @@ def cargar_inventario_desde_excel(ruta=None):
                         precio_compra_unidad = 0
                 else:
                     precio_compra_unidad = 0
-                if precio_compra_caja <= 0:
-                    precio_compra_caja = precio_compra_unidad * cantidad_caja
+                if precio_compra_unidad <= 0 and precio_compra_caja > 0:
+                    precio_compra_unidad = precio_compra_caja / cantidad_caja if cantidad_caja > 0 else precio_compra_caja
 
                 columnas_stock = ('Stock Inicial', 'Stock', 'Existencias', 'Cantidad Inicial')
                 stock_inicial = None
@@ -106,12 +106,12 @@ def cargar_inventario_desde_excel(ruta=None):
                         'descripcion': descripcion if descripcion else nombre,
                         'categoria': categoria if categoria else linea,
                         'linea': linea,
-                        'unidades_por_caja': cantidad_caja,
+                        'unidades_por_caja': 0,
                         'cantidad': stock_inicial,
-                        'precio_unitario': precio_venta_caja,
+                        'precio_unitario': precio_venta_unidad,
                         'precio_unidad': precio_venta_unidad,
                         'umbral_stock': 5,
-                        'costo_adquisicion': precio_compra_caja,
+                        'costo_adquisicion': precio_compra_unidad,
                         'hoja': 'PRODUCTOS'
                     }
                     todos_los_productos.append(producto)

@@ -27,7 +27,7 @@ La aplicación acepta estas variables de entorno; ninguna es obligatoria para el
 | `GAT_SECRET_KEY` | Firma segura de las sesiones | Clave aleatoria por ejecución |
 | `GAT_DATABASE_PATH` | Ruta del archivo SQLite | `donglai.db` junto a `database.py` |
 | `GAT_EXCEL_PATH` | Ruta del Excel de productos | `PRODUCTOS.xlsx` junto al código (o `PRODUCTS.xlsx`) |
-| `GAT_HOST` | Interfaz de red | `127.0.0.1` |
+| `GAT_HOST` | Interfaz de red | `0.0.0.0` (permite acceso en la red local) |
 | `GAT_PORT` | Puerto HTTP | `5000` |
 | `GAT_DEBUG` | Activa el depurador local (`1`, `true`, `yes` o `si`) | Desactivado |
 

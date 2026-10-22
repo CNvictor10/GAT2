@@ -2,7 +2,7 @@
 
 # Registramos estas vistas en la instancia Flask existente para conservar las URL.
 from app import *  # noqa: F401,F403
-from routes.auth import admin_required, role_required
+from routes.auth import role_required
 
 @app.route('/inicio')
 @flask_login.login_required

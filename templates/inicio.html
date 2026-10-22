@@ -361,7 +361,7 @@
                         callbacks: {
                             label: function(context) {
                                 if (context.parsed.y === 0) return 'Sin ventas';
-                                return 'Ventas: S/ ' + context.parsed.y.toFixed(2);
+                                return 'Ventas: ' + formatCurrency(context.parsed.y);
                             }
                         }
                     }
@@ -369,7 +369,7 @@
                 scales: {
                     y: {
                         grid: { color: '#f1f5f9' },
-                        ticks: { color: '#64748b', font: { size: 11 }, callback: function(value) { return 'S/ ' + value.toFixed(0); } },
+                        ticks: { color: '#64748b', font: { size: 11 }, callback: function(value) { return 'S/ ' + Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 }); } },
                         beginAtZero: true
                     },
                     x: {
