@@ -85,6 +85,53 @@ def api_dashboard_data():
                 'cantidad': row[1] or 0,
                 'umbral': row[2] or 5
             })
+
+        cursor.execute('''
+            SELECT u.nombre, COALESCE(SUM(mc.ingreso_total), 0),
+                   COUNT(DISTINCT CASE WHEN mc.id IS NOT NULL THEN c.id END)
+            FROM usuarios u
+            LEFT JOIN cotizaciones c ON c.usuario_id = u.id
+            LEFT JOIN movimientos_caja mc
+                ON mc.cotizacion_id = c.id AND strftime('%Y-%m', mc.fecha) = ?
+            WHERE LOWER(TRIM(u.rol)) = 'usuario'
+            GROUP BY u.id, u.nombre
+            ORDER BY COALESCE(SUM(mc.ingreso_total), 0) DESC, u.nombre COLLATE NOCASE
+        ''', (mes_actual,))
+        ventas_por_vendedor = [
+            {'nombre': row[0], 'total': round(float(row[1] or 0), 2), 'cotizaciones': int(row[2] or 0)}
+            for row in cursor.fetchall()
+        ]
+
+        cursor.execute('''
+            SELECT COALESCE(i.nombre, 'Producto #' || cd.producto_id),
+                   COALESCE(SUM(cd.cantidad), 0),
+                   COALESCE(SUM(cd.cantidad * cd.precio_unitario_cotizado), 0)
+            FROM cotizacion_detalles cd
+            JOIN cotizaciones c ON c.id = cd.cotizacion_id
+            LEFT JOIN inventario i ON i.id = cd.producto_id
+            WHERE c.estado IN ('Aprobada', 'Pagada', 'Parcial')
+              AND strftime('%Y-%m', COALESCE(NULLIF(c.fecha_aprobacion, ''), c.fecha)) = ?
+            GROUP BY cd.producto_id, i.nombre
+            ORDER BY SUM(cd.cantidad) DESC, SUM(cd.cantidad * cd.precio_unitario_cotizado) DESC
+            LIMIT 8
+        ''', (mes_actual,))
+        productos_mas_vendidos = [
+            {'nombre': row[0], 'cantidad': int(row[1] or 0), 'monto': round(float(row[2] or 0), 2)}
+            for row in cursor.fetchall()
+        ]
+
+        cursor.execute('''
+            SELECT COALESCE(NULLIF(TRIM(tipo_pago), ''), 'No especificado'),
+                   COUNT(*), COALESCE(SUM(ingreso_total), 0)
+            FROM movimientos_caja
+            WHERE strftime('%Y-%m', fecha) = ?
+            GROUP BY COALESCE(NULLIF(TRIM(tipo_pago), ''), 'No especificado')
+            ORDER BY COUNT(*) DESC, SUM(ingreso_total) DESC
+        ''', (mes_actual,))
+        medios_pago_mas_usados = [
+            {'nombre': row[0], 'operaciones': int(row[1] or 0), 'monto': round(float(row[2] or 0), 2)}
+            for row in cursor.fetchall()
+        ]
         
         conn.close()
         
@@ -99,6 +146,9 @@ def api_dashboard_data():
                 'labels_semana': labels_semana,
                 'cotizaciones_recientes': cotizaciones_recientes,
                 'productos_stock_bajo': productos_stock_bajo,
+                'ventas_por_vendedor': ventas_por_vendedor,
+                'productos_mas_vendidos': productos_mas_vendidos,
+                'medios_pago_mas_usados': medios_pago_mas_usados,
                 'timestamp': datetime.datetime.now().strftime('%H:%M:%S')
             }
         })

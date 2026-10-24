@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="container mt-4 mb-5">
-    <form method="POST" action="{{ url_for('editar_cotizacion', id=cotizacion[0]) }}" id="editarCotizacionEnDetalle">
+    <form method="POST" action="{{ url_for('editar_cotizacion', id=cotizacion[0]) }}" id="editarCotizacionEnDetalle" novalidate>
 
     {# --- CABECERA: Título y Estado --- #}
     <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 border-bottom pb-3 gap-2">
@@ -150,6 +150,7 @@
                 </table>
             </div>
             <div class="text-end fw-bold fs-5 text-success">Total: S/ <span id="totalEdicionDetalle">0.00</span></div>
+            <div id="productEditFeedback" class="small text-success mt-1" aria-live="polite"></div>
             <input type="hidden" name="productos_seleccionados" id="productosSeleccionadosDetalle">
             <input type="hidden" name="origen_detalle" value="1">
         </div>
@@ -167,7 +168,7 @@
                         <button type="button" id="btnEditarEnDetalle" class="btn btn-sm btn-warning text-dark fw-bold px-3 shadow-sm">
                             <i class="fas fa-edit me-1"></i>{{ t('btn_editar') }}
                         </button>
-                        <button type="submit" id="btnGuardarEnDetalle" class="btn btn-sm btn-success fw-bold px-3 shadow-sm" disabled>
+                        <button type="submit" id="btnGuardarEnDetalle" class="btn btn-sm btn-success fw-bold px-3 shadow-sm">
                             <i class="fas fa-save me-1"></i>{{ t('btn_guardar') }}
                         </button>
                         {% endif %}
@@ -208,7 +209,7 @@
                     <div class="col-4"><label class="form-label fw-bold" for="costoProductoDetalle">Costo unitario</label><input type="number" id="costoProductoDetalle" class="form-control" min="0" step="0.01"></div>
                 </div>
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" id="confirmarProductoDetalle" class="btn btn-primary">Agregar a la cotización</button></div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button type="button" id="confirmarProductoDetalle" class="btn btn-primary" onclick="window.agregarProductoDetalle()">Agregar a la cotización</button></div>
         </div></div>
     </div>
     {% endif %}
@@ -232,6 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const productFilter = document.getElementById('filtroProductoDetalle');
     const filterStatus = document.getElementById('estadoFiltroProductoDetalle');
     const initialProducts = {{ detalles|tojson }};
+    const draftKey = 'quote-edit-draft-{{ cotizacion[0] }}';
     const products = initialProducts.map((item, index) => ({
         tempId: index + 1,
         id: Number(item.producto_id),
@@ -333,32 +335,65 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     filterProducts();
 
-    document.getElementById('confirmarProductoDetalle').addEventListener('click', () => {
+    window.agregarProductoDetalle = () => {
         const option = productSelect.selectedOptions[0];
         const quantity = Number.parseInt(document.getElementById('cantidadProductoDetalle').value, 10);
-        const price = Number(document.getElementById('precioProductoDetalle').value);
-        if (!option?.value || !quantity || quantity < 1 || !Number.isFinite(price) || price <= 0) {
+        const precio = Number(document.getElementById('precioProductoDetalle').value);
+        if (!option?.value || !quantity || quantity < 1 || !Number.isFinite(precio) || precio <= 0) {
             alert('Selecciona un producto e ingresa una cantidad y precio válidos.');
-            return;
+            return false;
         }
-        const id = Number(option.value);
-        const existing = products.find(product => product.id === id);
-        if (existing) existing.cantidad += quantity;
-        else products.push({
-            tempId: nextId++, id, nombre: option.dataset.nombre,
-            cantidad: quantity, precio, unidad: 'und',
-            costo: Number(document.getElementById('costoProductoDetalle').value) || 0
-        });
-        renderProducts();
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalProductoDetalle')).hide();
-        productSelect.value = ''; productFilter.value = '';
-        document.getElementById('cantidadProductoDetalle').value = '1';
-        document.getElementById('precioProductoDetalle').value = '';
-        document.getElementById('costoProductoDetalle').value = '';
-        filterProducts();
-    });
+        try {
+            const id = Number(option.value);
+            const nombre = option.dataset.nombre || option.textContent.trim();
+            const costo = Number(document.getElementById('costoProductoDetalle').value) || 0;
+            const existing = products.find(product => Number(product.id) === id);
+            if (existing) {
+                existing.cantidad += quantity;
+                existing.precio = precio;
+                existing.costo = costo;
+            } else {
+                products.push({
+                    tempId: nextId++, id, nombre,
+                    cantidad: quantity, precio, unidad: 'und', costo
+                });
+            }
+
+            renderProducts();
+            document.getElementById('productEditFeedback').textContent = `${nombre} agregado a la cotización. Ahora pulsa Guardar para conservar los cambios.`;
+            productSelect.value = ''; productFilter.value = '';
+            document.getElementById('cantidadProductoDetalle').value = '1';
+            document.getElementById('precioProductoDetalle').value = '';
+            document.getElementById('costoProductoDetalle').value = '';
+            filterProducts();
+            const modalElement = document.getElementById('modalProductoDetalle');
+            try {
+                window.bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+            } catch (modalError) {
+                console.error('El producto ya se agregó, pero no se pudo cerrar el modal.', modalError);
+                modalElement.classList.remove('show');
+                modalElement.style.display = 'none';
+                modalElement.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('modal-open');
+                document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+            }
+            return true;
+        } catch (error) {
+            console.error('No se pudo agregar el producto a la cotización.', error);
+            alert(`No se pudo agregar el producto: ${error.message || error}`);
+            return false;
+        }
+    };
 
     form.addEventListener('submit', event => {
+        const clienteNombre = form.elements.namedItem('cliente_nombre');
+        const razonSocial = form.elements.namedItem('razon_social_id');
+        const fechaCotizacion = form.elements.namedItem('fecha');
+        if (!clienteNombre?.value.trim() || !razonSocial?.value || !fechaCotizacion?.value) {
+            event.preventDefault();
+            alert('Completa el nombre del cliente, la razón social y la fecha antes de guardar.');
+            return;
+        }
         if (!products.length) {
             event.preventDefault();
             alert('Agrega al menos un producto antes de guardar.');
@@ -368,7 +403,41 @@ document.addEventListener('DOMContentLoaded', () => {
             id: product.id, cantidad: product.cantidad, precio: product.precio,
             costo: product.costo, unidad: product.unidad
         })));
+        try {
+            sessionStorage.setItem(draftKey, JSON.stringify({
+                products,
+                cliente_nombre: clienteNombre.value,
+                cliente_celular: form.elements.namedItem('cliente_celular').value,
+                cliente_direccion: form.elements.namedItem('cliente_direccion').value,
+                cliente_ruc: form.elements.namedItem('cliente_ruc').value,
+                razon_social_id: razonSocial.value,
+                fecha: fechaCotizacion.value
+            }));
+        } catch (error) {
+            console.warn('No se pudo guardar una copia temporal del borrador.', error);
+        }
     });
+
+    const saveState = new URLSearchParams(window.location.search).get('guardado');
+    if (saveState === '1') {
+        sessionStorage.removeItem(draftKey);
+    } else if (saveState === 'error') {
+        try {
+            const draft = JSON.parse(sessionStorage.getItem(draftKey) || 'null');
+            if (draft) {
+                products.splice(0, products.length, ...draft.products);
+                form.elements.cliente_nombre.value = draft.cliente_nombre || '';
+                form.elements.cliente_celular.value = draft.cliente_celular || '';
+                form.elements.cliente_direccion.value = draft.cliente_direccion || '';
+                form.elements.cliente_ruc.value = draft.cliente_ruc || '';
+                form.elements.razon_social_id.value = draft.razon_social_id || '';
+                form.elements.fecha.value = draft.fecha || '';
+                editButton.click();
+            }
+        } catch (error) {
+            console.error('No se pudo recuperar el borrador de la cotización.', error);
+        }
+    }
 });
 </script>
 {% endif %}

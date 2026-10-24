@@ -33,6 +33,7 @@ from reportlab.lib.enums import TA_RIGHT
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 
 app = Flask(__name__)
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 app.config['MAX_CONTENT_LENGTH'] = 15 * 1024 * 1024
 app.config['ADMIN_PRINCIPAL_ID'] = int(os.environ.get('GAT_ADMIN_USER_ID', '1'))
 app.jinja_env.globals['admin_principal_id'] = app.config['ADMIN_PRINCIPAL_ID']

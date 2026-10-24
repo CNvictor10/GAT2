@@ -414,8 +414,10 @@ def editar_cotizacion(id):
         except Exception as e:
             conn.rollback()
             flash(f'Error: {e}', 'danger')
-            destino = 'detalle_cotizacion' if request.form.get('origen_detalle') else 'editar_cotizacion'
-            return redirect(url_for(destino, id=id))
+            if request.form.get('origen_detalle'):
+                # Indica al detalle que debe recuperar el borrador guardado en el navegador.
+                return redirect(url_for('detalle_cotizacion', id=id, guardado='error'))
+            return redirect(url_for('editar_cotizacion', id=id))
         finally:
             conn.close()
 
@@ -596,9 +598,9 @@ def exportar_cotizacion_pdf(id):
 
         datos_empresa = [f"<b>{xml_escape(cotizacion['razon_social_nombre'])}</b>"]
         if cotizacion['razon_social_ruc']:
-            datos_empresa.append(f"RUC: {xml_escape(cotizacion['razon_social_ruc'])}")
+            datos_empresa.append(f"<b>RUC:</b> {xml_escape(cotizacion['razon_social_ruc'])}")
         if cotizacion['razon_social_telefono']:
-            datos_empresa.append(f"Celular: {xml_escape(cotizacion['razon_social_telefono'])}")
+            datos_empresa.append(f"<b>Celular:</b> {xml_escape(cotizacion['razon_social_telefono'])}")
         info_empresa = Paragraph('<br/>'.join(datos_empresa), styles['Normal'])
 
         if cotizacion['razon_social_medios_pago']:
@@ -619,12 +621,12 @@ def exportar_cotizacion_pdf(id):
         story.append(Spacer(1, 1))
 
         fecha_cotizacion_pdf = datetime.datetime.strptime(str(cotizacion['fecha']).split('.')[0], '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%Y') if cotizacion['fecha'] else ''
-        ruc_text = f" | RUC: {cotizacion['cliente_ruc']}" if cotizacion['cliente_ruc'] else ""
-        celular_text = f" | Celular: {cotizacion['cliente_celular']}" if cotizacion['cliente_celular'] else ""
-        direccion_text = f" | Dirección: {xml_escape(cotizacion['cliente_direccion'])}" if cotizacion['cliente_direccion'] else ""
+        ruc_text = f" | <b>RUC:</b> {cotizacion['cliente_ruc']}" if cotizacion['cliente_ruc'] else ""
+        celular_text = f" | <b>Celular:</b> {cotizacion['cliente_celular']}" if cotizacion['cliente_celular'] else ""
+        direccion_text = f" | <b>Dirección:</b> {xml_escape(cotizacion['cliente_direccion'])}" if cotizacion['cliente_direccion'] else ""
 
         story.append(Paragraph('<b>COTIZACI\u00d3N</b>', styles['QuoteTitle']))
-        info_line = f"<b>Vendedor:</b> {xml_escape(cotizacion['vendedor'])} | <b>Fecha:</b> {fecha_cotizacion_pdf}<br/><b>Cliente:</b> {xml_escape(cotizacion['cliente_nombre'])}{ruc_text}{celular_text}{direccion_text} | Pago: {xml_escape(cotizacion['tipo_pago'] or '')}"
+        info_line = f"<b>Vendedor:</b> {xml_escape(cotizacion['vendedor'])} | <b>Fecha:</b> {fecha_cotizacion_pdf}<br/><b>Cliente:</b> {xml_escape(cotizacion['cliente_nombre'])}{ruc_text}{celular_text}{direccion_text} | <b>Pago:</b> {xml_escape(cotizacion['tipo_pago'] or '')}"
         story.append(Paragraph(info_line, styles['Normal']))
         story.append(Spacer(1, 2))
 
