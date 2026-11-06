@@ -1,0 +1,259 @@
+{% extends 'base.html' %}
+{% block title %}Pagos y saldos{% endblock %}
+{% block extra_css %}
+<style>
+.payments-page{width:100%;max-width:3000px;margin:1rem auto}
+.payments-header{background:linear-gradient(120deg,var(--sidebar-bg),var(--primary-blue));color:#fff;border-radius:14px;padding:1.4rem 1.6rem}
+.payments-card{background:var(--bs-body-bg,#fff);border:1px solid #e4eaf1;border-radius:14px;padding:1.25rem;box-shadow:0 8px 24px rgba(15,35,60,.06)}
+.payment-actions{display:flex;align-items:center;gap:.45rem;flex-wrap:nowrap;white-space:nowrap}
+.payment-form{display:flex;gap:.45rem;align-items:center;min-width:320px}
+.payment-actions .payment-form{min-width:max-content}
+.payment-form input{width:110px}
+.payment-form select{width:135px}
+.payment-form .btn{min-height:36px;white-space:nowrap}
+.balance-value{font-weight:700;color:#b45309}
+.payment-history{max-height:45vh;overflow:auto}
+.payment-history thead th{position:sticky;top:0;z-index:1}
+.kpi-payment-card{border-radius:12px;padding:1rem;border:1px solid #e2e8f0;background:#f8fafc;transition:transform .15s ease}
+.kpi-payment-card:hover{transform:translateY(-2px)}
+.date-chip{display:inline-block;padding:0.25rem 0.65rem;border-radius:50rem;font-size:0.8rem;text-decoration:none;border:1px solid #cbd5e1;background:#fff;color:#475569;margin-right:0.35rem;margin-bottom:0.35rem;transition:all .15s}
+.date-chip:hover,.date-chip.active{background:var(--primary-blue,#079da1);color:#fff;border-color:var(--primary-blue,#079da1)}
+@media(max-width:768px){
+  .payments-page{padding-inline:.25rem}
+  .payments-card{padding:.75rem}
+  .payment-form{min-width:0;flex-wrap:wrap}
+  .payment-form input,.payment-form select{flex:1;min-width:110px}
+}
+</style>
+{% endblock %}
+{% block content %}
+<main class="container-fluid payments-page">
+    <header class="payments-header mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <span class="rounded-3 d-flex align-items-center justify-content-center" style="width:48px;height:48px;background:rgba(255,255,255,.14)">
+                <i class="fas fa-money-bill-transfer fs-4"></i>
+            </span>
+            <div>
+                <h1 class="h4 fw-bold mb-1">Pagos y saldos</h1>
+                <p class="mb-0 small text-white-50">Reporte de cobranzas diarias, registro de abonos y control sin necesidad de cierre manual de caja.</p>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ url_for('imprimir_reporte_pagos_dia', fecha=fecha_filtro) }}" target="_blank" class="btn btn-light fw-bold shadow-sm text-danger" title="Generar e imprimir informe oficial en PDF">
+                <i class="fas fa-file-pdf me-1"></i> Imprimir Reporte PDF del Día
+            </a>
+        </div>
+    </header>
+
+    {# --- SECCIÓN 1: DETALLE Y ARQUEO DIARIO DE COBROS (SIN CIERRE MANUAL) --- #}
+    <section class="payments-card mb-4 border-primary" style="border-top: 4px solid var(--primary-blue,#079da1);">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+            <div>
+                <h2 class="h5 fw-bold mb-1 text-dark">
+                    <i class="fas fa-calendar-day text-primary me-2"></i>Cobros del día: {{ fecha_filtro_formateada }}
+                    {% if es_hoy %}<span class="badge bg-success ms-2 font-monospace" style="font-size: 0.75rem;">HOY</span>{% endif %}
+                </h2>
+                <p class="text-muted small mb-0">Detalle de todos los pagos recibidos en esta fecha. Puedes imprimir el reporte o consultar días anteriores directamente.</p>
+            </div>
+
+            {# Selector de fecha y botón imprimir #}
+            <form method="GET" action="{{ url_for('listar_pagos') }}" class="d-flex align-items-center gap-2 flex-wrap">
+                <label for="inputFechaFiltro" class="form-label small fw-bold text-muted mb-0">Fecha:</label>
+                <input type="date" id="inputFechaFiltro" name="fecha" value="{{ fecha_filtro }}" class="form-control form-control-sm" style="width: auto;">
+                <button type="submit" class="btn btn-sm btn-primary fw-semibold"><i class="fas fa-filter me-1"></i>Ver</button>
+                {% if not es_hoy %}
+                <a href="{{ url_for('listar_pagos') }}" class="btn btn-sm btn-outline-secondary" title="Volver al día de hoy">Hoy</a>
+                {% endif %}
+                <a href="{{ url_for('imprimir_reporte_pagos_dia', fecha=fecha_filtro) }}" target="_blank" class="btn btn-sm btn-outline-danger fw-bold shadow-sm ms-1" title="Abrir reporte PDF para imprimir">
+                    <i class="fas fa-print me-1"></i> Imprimir PDF
+                </a>
+            </form>
+        </div>
+
+        {# Chips de fechas disponibles con pagos #}
+        {% if fechas_disponibles %}
+        <div class="mb-3 pt-2 border-top">
+            <span class="text-muted small fw-semibold me-2"><i class="fas fa-clock-rotate-left me-1"></i>Días con cobros:</span>
+            {% for item in fechas_disponibles %}
+                <a href="{{ url_for('listar_pagos', fecha=item['f']) }}" class="date-chip {% if item['f'] == fecha_filtro %}active{% endif %}" title="S/ {{ (item['total'] or 0)|dinero }} en {{ item['cantidad'] }} pagos">
+                    {{ item['f'][8:10] }}/{{ item['f'][5:7] }} ({{ item['cantidad'] }})
+                </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {# Tarjetas de Resumen KPI por Medio de Pago #}
+        <div class="row g-3 mb-4">
+            <div class="col-md-4 col-sm-6">
+                <div class="kpi-payment-card border-success" style="background: #f0fdf4;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-bold text-success text-uppercase">Total Recaudado (Día)</span>
+                        <i class="fas fa-coins text-success fs-5"></i>
+                    </div>
+                    <div class="fs-3 fw-bold text-success">S/ {{ total_dia|dinero }}</div>
+                    <div class="small text-muted">{{ pagos_dia|length }} transacción(es) registrada(s)</div>
+                </div>
+            </div>
+
+            {% for medio, monto in desglose_dia.items() %}
+            <div class="col-md-2 col-sm-4 col-6">
+                <div class="kpi-payment-card h-100">
+                    <div class="small fw-bold text-muted text-uppercase text-truncate mb-1">{{ medio }}</div>
+                    <div class="fs-5 fw-bold text-dark">S/ {{ monto|dinero }}</div>
+                    <div class="small text-muted">{{ conteo_medios_dia.get(medio, 1) }} pago(s)</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {# Tabla detallada de pagos de esa fecha #}
+        <div class="table-responsive border rounded">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 5%;" class="text-center">#</th>
+                        <th style="width: 10%;" class="text-center">Hora</th>
+                        <th style="width: 15%;">Cotización</th>
+                        <th style="width: 30%;">Cliente</th>
+                        <th style="width: 15%;">Medio de pago</th>
+                        <th style="width: 12%;">Vendedor</th>
+                        <th style="width: 13%;" class="text-end">Monto cobrado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for p in pagos_dia %}
+                    <tr>
+                        <td class="text-center text-muted small">{{ loop.index }}</td>
+                        <td class="text-center font-monospace">{{ p['hora'] }}</td>
+                        <td>
+                            <a href="{{ url_for('detalle_cotizacion', id=p['cotizacion_id']) }}" class="fw-bold text-decoration-none">
+                                {{ p['numero_cotizacion'] or ('#' ~ p['cotizacion_id']) }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="fw-semibold text-dark">{{ p['cliente_nombre'] }}</span>
+                            {% if p['cliente_celular'] or p['cliente_ruc'] %}
+                            <small class="text-muted d-block" style="font-size: 0.78rem;">
+                                {% if p['cliente_celular'] %}<i class="fas fa-phone-alt me-1"></i>{{ p['cliente_celular'] }}{% endif %}
+                                {% if p['cliente_ruc'] %} &nbsp;·&nbsp; RUC/DNI: {{ p['cliente_ruc'] }}{% endif %}
+                            </small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge text-bg-light border px-2 py-1 fw-semibold">{{ p['tipo_pago'] }}</span>
+                        </td>
+                        <td class="small text-muted">{{ p['vendedor'] or '-' }}</td>
+                        <td class="text-end fw-bold text-success fs-6">S/ {{ (p['ingreso_total'] or 0)|dinero }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="fas fa-calendar-xmark fs-3 text-secondary mb-2 d-block"></i>
+                            No se registraron cobros en la fecha <strong>{{ fecha_filtro_formateada }}</strong>.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+                {% if pagos_dia %}
+                <tfoot class="table-light fw-bold">
+                    <tr>
+                        <td colspan="6" class="text-end text-uppercase pt-3">Total del día:</td>
+                        <td class="text-end text-success fs-5 pt-3 pe-3">S/ {{ total_dia|dinero }}</td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </section>
+
+    {# --- SECCIÓN 2: COTIZACIONES POR COBRAR --- #}
+    <section class="payments-card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3 gap-3 flex-wrap">
+            <div>
+                <h2 class="h5 fw-bold mb-1">Cotizaciones por cobrar</h2>
+                <p class="text-muted small mb-0">Cotizaciones pendientes o con saldo: registra abonos aquí. Las que no tienen abonos también se pueden rechazar.</p>
+                <p class="text-muted small mb-0 mt-1">Cada abono se suma a caja al registrarlo; el primer pago confirma la venta y descuenta el inventario una sola vez.</p>
+            </div>
+            <span class="badge text-bg-warning fs-6 px-3 py-2">{{ cotizaciones|length }} abiertas</span>
+        </div>
+        <div class="table-responsive"><table class="table table-hover align-middle">
+            <thead class="table-light"><tr><th>N.º</th><th>Cliente</th><th>Fecha</th><th class="text-end">Total</th><th class="text-end">Abonado</th><th class="text-end">Saldo</th><th>Estado</th><th>Registrar pago</th></tr></thead>
+            <tbody>
+            {% for c in cotizaciones %}
+                {% set saldo = (c['total'] or 0) - (c['abonado'] or 0) %}
+                <tr>
+                    <td><a href="{{ url_for('detalle_cotizacion', id=c['id']) }}" class="fw-bold">#{{ c['id'] }}</a></td>
+                    <td class="fw-semibold">{{ c['cliente_nombre'] }}</td><td>{{ c['fecha'] }}</td>
+                    <td class="text-end">S/ {{ (c['total'] or 0)|dinero }}</td>
+                    <td class="text-end text-success">S/ {{ (c['abonado'] or 0)|dinero }}</td>
+                    <td class="text-end balance-value">S/ {{ saldo|dinero }}</td>
+                    <td><span class="badge {{ 'text-bg-info' if c['estado']=='Parcial' else 'text-bg-warning' }}">{{ 'Pago parcial' if c['estado']=='Parcial' else 'Pendiente' }}</span></td>
+                    <td><div class="payment-actions">
+                        <form class="payment-form" method="POST" action="{{ url_for('route_aprobar_cotizacion', cotizacion_id=c['id']) }}">
+                            <input type="number" class="form-control form-control-sm" name="monto" min="0.01" max="{{ '%.2f'|format(saldo) }}" step="0.01" value="{{ '%.2f'|format(saldo) }}" required aria-label="Monto del abono">
+                            <select class="form-select form-select-sm" name="tipo_pago" required aria-label="Medio de pago">
+                                <option value="" selected disabled>Medio</option><option>Efectivo</option><option>Yape</option><option>Plin</option><option>Transferencia</option><option>Tarjeta</option><option>Otro</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline-success" type="submit"><i class="fas fa-check me-1"></i>Abonar</button>
+                        </form>
+                        {% if c['estado'] == 'Pendiente' and (c['abonado'] or 0) <= 0 %}
+                        <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#rechazarCotizacion{{ c['id'] }}"><i class="fas fa-times me-1"></i>Rechazar</button>
+                        {% endif %}
+                    </div></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8" class="text-center text-muted py-4">No hay cotizaciones con saldo pendiente.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% for c in cotizaciones %}
+            {% if c['estado'] == 'Pendiente' and (c['abonado'] or 0) <= 0 %}
+            <div class="modal fade" id="rechazarCotizacion{{ c['id'] }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form method="POST" action="{{ url_for('rechazar_cotizacion', id=c['id']) }}">
+                            <div class="modal-header"><h5 class="modal-title">Rechazar cotización #{{ c['id'] }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+                            <div class="modal-body">
+                                <label class="form-label" for="observacionRechazo{{ c['id'] }}">Motivo u observación (obligatorio)</label>
+                                <textarea class="form-control" id="observacionRechazo{{ c['id'] }}" name="observacion_rechazo" rows="4" maxlength="1000" required placeholder="Describe brevemente por qué se rechazó esta cotización"></textarea>
+                            </div>
+                            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-danger" type="submit">Guardar rechazo</button></div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+    </section>
+
+    {# --- SECCIÓN 3: MOVIMIENTOS RECIENTES GENERALES --- #}
+    <section class="payments-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="h5 fw-bold mb-1">Historial general de pagos</h2>
+                <p class="text-muted small mb-0">Últimos 100 abonos recibidos en el sistema.</p>
+            </div>
+        </div>
+        <div class="table-responsive payment-history">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr><th>Fecha y hora</th><th>N.º cotización</th><th>Cliente</th><th>Medio de pago</th><th class="text-end">Importe recibido</th></tr>
+                </thead>
+                <tbody>
+                    {% for p in pagos %}
+                    <tr>
+                        <td>{{ p['fecha'] }}</td>
+                        <td><a href="{{ url_for('detalle_cotizacion', id=p['id']) }}" class="fw-semibold">{{ p['numero_cotizacion'] or ('#' ~ p['id']) }}</a></td>
+                        <td>{{ p['cliente_nombre'] }}</td>
+                        <td><span class="badge text-bg-light border">{{ p['tipo_pago'] }}</span></td>
+                        <td class="text-end fw-semibold text-success">S/ {{ (p['ingreso_total'] or 0)|dinero }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="text-center text-muted py-4">Aún no se han registrado pagos.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+{% endblock %}

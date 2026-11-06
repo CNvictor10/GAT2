@@ -4,7 +4,7 @@ Aplicación web local para gestionar inventario, cotizaciones y cierres de caja.
 
 ## Ejecutar en Windows
 
-En VS Code, abre directamente la carpeta `GAT` que contiene `app.py`, `routes/` y `.vscode/`. Así se usa una sola carpeta de proyecto y el entorno correcto. En la terminal integrada ejecuta:
+En VS Code, abre directamente la carpeta `GAT` que contiene `backend/`, `frontend/`, `database/` y `.vscode/`. Así se usa una sola carpeta de proyecto y el entorno correcto. En la terminal integrada ejecuta:
 
 ```powershell
 python -m venv .venv
@@ -25,35 +25,34 @@ La aplicación acepta estas variables de entorno; ninguna es obligatoria para el
 | Variable | Uso | Valor predeterminado |
 | --- | --- | --- |
 | `GAT_SECRET_KEY` | Firma segura de las sesiones | Clave aleatoria por ejecución |
-| `GAT_DATABASE_PATH` | Ruta del archivo SQLite | `donglai.db` junto a `database.py` |
+| `GAT_DATABASE_PATH` | Ruta del archivo SQLite | `database/donglai.db` |
 | `GAT_EXCEL_PATH` | Ruta del Excel de productos | `PRODUCTOS.xlsx` junto al código (o `PRODUCTS.xlsx`) |
 | `GAT_HOST` | Interfaz de red | `0.0.0.0` (permite acceso en la red local) |
 | `GAT_PORT` | Puerto HTTP | `5000` |
 | `GAT_DEBUG` | Activa el depurador local (`1`, `true`, `yes` o `si`) | Desactivado |
 
-Respalda `donglai.db` y el Excel antes de moverlos o reemplazarlos. La carpeta `dist` y los ejecutables compilados son salidas de distribución; el código fuente en la raíz es la versión editable.
+Respalda `database/donglai.db` y el Excel antes de moverlos o reemplazarlos. La carpeta `dist` y los ejecutables compilados son salidas de distribución; el código fuente es la versión editable.
 
 ## Cómo está organizado el código
 
-- `app.py`: configura Flask, carga dependencias compartidas y registra las rutas.
-- `routes/auth.py`: inicio de sesión, registro y cierre de sesión.
-- `routes/admin.py`: administración de roles, estado de cuentas y restablecimiento de contraseñas.
-- `routes/dashboard.py`: página inicial y datos del panel.
-- `routes/inventory.py`: operaciones, exportación e importación de Excel sin borrar el inventario.
-- `routes/quotes.py`: creación, edición y exportación de cotizaciones.
-- `routes/cash_closing.py`: cierres de caja, historial e informes.
-- `database.py`: conexiones, tablas y operaciones SQLite.
-- `donglai.db`: base de datos activa de SQLite; los archivos locales `.db` están excluidos de Git.
+- `app.py`, `database.py` y `crear_admin.py`: lanzadores de compatibilidad para conservar los comandos existentes.
+- `backend/`: servidor Flask, rutas, autenticación, idiomas, importación de Excel y utilidades de administración.
+- `database/`: acceso al esquema SQLite y `donglai.db`, la base activa. Los archivos locales `.db` están excluidos de Git.
+- `frontend/templates/` y `frontend/static/`: páginas HTML, estilos, imágenes y archivos estáticos subidos.
 - `data/archive/`: bases originales preservadas antes de consolidar los datos. No se usan al ejecutar la aplicación.
 - `data/archive/donglai_dist_backup.db`: origen con el historial de cotizaciones y cierres.
 - `data/archive/donglai_parent_source.db`: origen con el inventario de la carpeta contenedora.
 - `data/archive/donglai_project_before_merge.db`: copia de la base activa anterior a la consolidación.
 - `app.spec`: configuración de PyInstaller para generar la aplicación de escritorio.
-- `excel_handler.py`: lectura del catálogo Excel. `Cant/Caja` se guarda en `unidades_por_caja`; el stock se toma de `Stock Inicial`, `Stock`, `Existencias` o `Cantidad Inicial` si una de esas columnas existe. Si falta, conserva el stock actual y asigna cero a productos nuevos.
-- `crear_admin.py`: configuración local y segura del administrador inicial; también permite recuperar el acceso del administrador desde la terminal del equipo.
-- `templates/` y `static/`: páginas HTML, estilos e imágenes.
+- `backend/excel_handler.py`: lectura del catálogo Excel. `Cant/Caja` se guarda en `unidades_por_caja`; el stock se toma de `Stock Inicial`, `Stock`, `Existencias` o `Cantidad Inicial` si una de esas columnas existe. Si falta, conserva el stock actual y asigna cero a productos nuevos.
+- `backend/crear_admin.py`: configuración local y segura del administrador inicial; también permite recuperar el acceso del administrador desde la terminal del equipo.
+- Desde Inventario se puede descargar el listado visible como Excel para conteo físico; conserva la búsqueda y agrega columnas para conteo, diferencia y observaciones.
+- Las cotizaciones usan un folio correlativo mensual (`AAAAMM-XXXX`); la secuencia vuelve a `0001` al cambiar de mes. La lista y el detalle muestran ese folio, y permite buscarlo sin cambiar el ID interno.
+- El módulo **Control de importaciones**, disponible para el administrador, organiza los registros del Excel `oficial.xlsx`; permite consultar, filtrar, agregar y editar importaciones, y descargar el listado filtrado en Excel.
+- Las cotizaciones se abren como PDF en el navegador para imprimir; el archivo usa el nombre del cliente. El PDF muestra el vendedor junto al total, con datos y medios de pago legibles.
+- Al crear cuentas de trabajadores desde Administración se solicita también su número de celular.
 
-Las rutas conservan sus direcciones actuales para que las plantillas sigan funcionando. La lógica SQL que aún está dentro de algunas vistas puede moverse después a `database.py` por partes, sin cambiar el esquema de SQLite de golpe.
+Las URL y los comandos actuales se conservan; los lanzadores de la raíz reenvían al código organizado por capas. La lógica SQL que aún está dentro de algunas vistas puede trasladarse gradualmente al módulo `database/`, sin cambiar el esquema de SQLite de golpe.
 
 La base activa reúne el inventario y el historial encontrados en los archivos originales. Para trabajar, abre únicamente esta carpeta del proyecto en VS Code y usa su `.venv`; evita abrir la carpeta contenedora que está un nivel arriba.
 

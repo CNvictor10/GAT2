@@ -1,0 +1,758 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('menu_dashboard') }} - Donglai{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    .kpi-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.25rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        border: 1px solid #e9edf4;
+        transition: all 0.2s ease;
+    }
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .kpi-info h3 {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #64748b;
+        margin: 0 0 6px 0;
+        font-weight: 600;
+    }
+    .kpi-value {
+        font-size: 1.65rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0 0 4px 0;
+        line-height: 1.2;
+    }
+    .kpi-trend {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 2px 10px;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .trend-up { background: #dcfce7; color: #16a34a; }
+    .kpi-icon-wrapper {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        background: #e4f6f5;
+        color: #079da1;
+        flex-shrink: 0;
+    }
+    .middle-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    .chart-card, .top-products-card, .section-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.25rem;
+        border: 1px solid #e9edf4;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .card-header-clean {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .card-header-clean h2 {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #0f172a;
+        margin: 0;
+    }
+    .view-all-link {
+        font-size: 0.75rem;
+        color: #05777b;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .view-all-link:hover { text-decoration: underline; }
+    .bottom-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.25rem;
+    }
+    .dashboard-insights-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+    .dashboard-insights-grid .chart-card { min-width: 0; }
+    .dashboard-insight-chart { position: relative; height: 270px; width: 100%; }
+    .dashboard-insight-empty {
+        height: 100%; display: flex; align-items: center; justify-content: center;
+        color: #94a3b8; text-align: center; font-size: .85rem;
+    }
+    .dashboard-insight-empty[hidden] { display: none; }
+    .imports-dashboard-card {
+        background: #fff; border: 1px solid #e8edf3; border-radius: 12px;
+        padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .imports-dashboard-chart { height: 245px; position: relative; }
+    .imports-dashboard-empty {
+        height: 100%; display: flex; align-items: center; justify-content: center;
+        color: #64748b; text-align: center; font-size: .85rem;
+    }
+    .imports-dashboard-empty[hidden] { display: none; }
+    .imports-dashboard-metric {
+        border: 1px solid #edf1f5; border-radius: 10px; height: 100%;
+        padding: .8rem; background: #f8fafc;
+    }
+    .imports-dashboard-metric span { color: #64748b; display: block; font-size: .72rem; }
+    .imports-dashboard-metric strong { color: #16324f; display: block; font-size: 1.35rem; margin-top: .2rem; }
+    .clean-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .clean-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .clean-item:last-child { border-bottom: none; }
+    .badge-status {
+        padding: 2px 12px;
+        border-radius: 20px;
+        font-size: 0.65rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        display: inline-block;
+    }
+    .badge-success { background: #dcfce7; color: #16a34a; }
+    .badge-warning { background: #fef3c7; color: #d97706; }
+    .badge-danger { background: #fee2e2; color: #dc2626; }
+    .badge-secondary { background: #f1f5f9; color: #64748b; }
+    .btn-reorder {
+        background: #079da1;
+        color: white;
+        border: none;
+        padding: 4px 14px;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-reorder:hover { background: #05777b; }
+    .empty-state {
+        text-align: center;
+        padding: 1.5rem 0;
+        color: #94a3b8;
+    }
+    .empty-state i { font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.5; }
+    .last-update {
+        font-size: 0.7rem;
+        color: #94a3b8;
+        text-align: right;
+        padding: 8px 0 0 0;
+    }
+    .error-box {
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+    }
+    @media (max-width: 992px) {
+        .middle-grid, .bottom-grid { grid-template-columns: 1fr; }
+        .dashboard-insights-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 576px) {
+        .kpi-grid { grid-template-columns: 1fr 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="top-header mb-4">
+    <div>
+        <h1 class="fw-bold text-dark m-0">{{ t('msg_bienvenido') }}, {{ current_user.nombre }}</h1>
+        <p class="text-muted small m-0">Resumen operativo en tiempo real desde Excel</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary bg-white text-dark py-2 px-3 border" style="min-width: auto; font-size: 0.85rem;">
+            <i class="fas fa-calendar-day me-2"></i> Hoy: {{ datetime.now().strftime('%d/%m/%Y') }}
+        </button>
+        <button class="btn btn-outline-primary bg-white text-dark py-2 px-3 border" style="min-width: auto; font-size: 0.85rem;" onclick="loadDashboardData()">
+            <i class="fas fa-sync-alt me-2"></i> Actualizar
+        </button>
+    </div>
+</div>
+
+<!-- KPIs -->
+<div class="kpi-grid">
+    <div class="kpi-card kpi-blue">
+        <div class="kpi-info">
+            <h3>VENTAS DEL MES</h3>
+            <p class="kpi-value" id="ventasMes">Cargando...</p>
+            <span class="kpi-trend trend-up"><i class="fas fa-arrow-trend-up"></i> En tiempo real</span>
+        </div>
+        <div class="kpi-icon-wrapper"><i class="fas fa-cart-shopping"></i></div>
+    </div>
+
+    <div class="kpi-card kpi-amber">
+        <div class="kpi-info">
+            <h3>COTIZACIONES PENDIENTES</h3>
+            <p class="kpi-value" id="cotizacionesPendientes">Cargando...</p>
+            <span class="text-muted small">Por aprobar</span>
+        </div>
+        <div class="kpi-icon-wrapper"><i class="fas fa-file-invoice-dollar"></i></div>
+    </div>
+
+    <div class="kpi-card kpi-green">
+        <div class="kpi-info">
+            <h3>PRODUCTOS TOTALES</h3>
+            <p class="kpi-value" id="totalProductos">Cargando...</p>
+            <span class="text-muted small">Desde Excel</span>
+        </div>
+        <div class="kpi-icon-wrapper"><i class="fas fa-boxes-stacked"></i></div>
+    </div>
+
+    <div class="kpi-card kpi-purple">
+        <div class="kpi-info">
+            <h3>STOCK BAJO</h3>
+            <p class="kpi-value text-danger" id="stockBajo">Cargando...</p>
+            <span class="text-danger fw-semibold small">Requieren atención</span>
+        </div>
+        <div class="kpi-icon-wrapper" style="background-color: #fee2e2; color: #dc2626;">
+            <i class="fas fa-triangle-exclamation"></i>
+        </div>
+    </div>
+</div>
+
+{% if current_user.rol == 'admin' and current_user.id|string == admin_principal_id|string %}
+<section class="imports-dashboard-card mb-4" aria-labelledby="importsDashboardTitle">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h2 class="h6 fw-bold text-dark mb-1" id="importsDashboardTitle"><i class="fas fa-ship text-primary me-2"></i>Vista general de importaciones</h2>
+            <p class="text-muted small mb-0">Resumen de operaciones y distribución por canal SUNAT.</p>
+        </div>
+        <a href="{{ url_for('listar_importaciones') }}" class="view-all-link">Abrir control de importaciones <i class="fas fa-arrow-right ms-1"></i></a>
+    </div>
+    <div class="row g-3 align-items-stretch">
+        <div class="col-12 col-xl-7">
+            <div class="row g-2">
+                <div class="col-6"><div class="imports-dashboard-metric"><span>Importaciones registradas</span><strong id="dashboardImportsTotal">Cargando...</strong></div></div>
+                <div class="col-6"><div class="imports-dashboard-metric"><span>En canal naranja / rojo</span><strong id="dashboardImportsReview">Cargando...</strong></div></div>
+                <div class="col-6"><div class="imports-dashboard-metric"><span>Demora promedio</span><strong id="dashboardImportsDelay">Cargando...</strong></div></div>
+                <div class="col-6"><div class="imports-dashboard-metric"><span>Levante promedio</span><strong id="dashboardImportsRelease">Cargando...</strong></div></div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-5">
+            <div class="imports-dashboard-chart">
+                <canvas id="dashboardImportsChart" aria-label="Importaciones por canal SUNAT" role="img"></canvas>
+                <div class="imports-dashboard-empty" id="dashboardImportsEmpty" hidden>Sin registros de importación para mostrar.</div>
+            </div>
+        </div>
+    </div>
+    <div class="text-danger small mt-2" id="dashboardImportsError" role="status" hidden></div>
+</section>
+{% endif %}
+
+<!-- Gráfico y Módulos -->
+<div class="middle-grid">
+    <div class="chart-card">
+        <div class="card-header-clean mb-3">
+            <h2 class="h6 fw-bold m-0 text-dark"><i class="fas fa-chart-line text-primary me-2"></i>Rendimiento de Ventas</h2>
+            <span class="text-muted small" id="ultimaActualizacion">Actualizando...</span>
+        </div>
+        <div style="position: relative; height:240px; width:100%">
+            <canvas id="dashboardSalesChart"></canvas>
+        </div>
+        <div class="last-update" id="timestampDisplay">⏱️ Cargando datos...</div>
+    </div>
+
+</div>
+
+<!-- Indicadores adicionales de ventas del mes -->
+<div class="dashboard-insights-grid">
+    <div class="chart-card">
+        <div class="card-header-clean mb-3">
+            <h2 class="h6 fw-bold m-0 text-dark"><i class="fas fa-user-tie text-primary me-2"></i>Avance por vendedor</h2>
+            <span class="text-muted small">Trabajadores generales · este mes</span>
+        </div>
+        <div class="dashboard-insight-chart">
+            <canvas id="dashboardSellersChart" aria-label="Ventas cobradas por vendedor este mes"></canvas>
+            <div class="dashboard-insight-empty" id="dashboardSellersEmpty" hidden>Sin ventas cobradas de trabajadores generales este mes.</div>
+        </div>
+    </div>
+    <div class="chart-card">
+        <div class="card-header-clean mb-3">
+            <h2 class="h6 fw-bold m-0 text-dark"><i class="fas fa-box-open text-warning me-2"></i>Productos más vendidos</h2>
+            <span class="text-muted small">Este mes</span>
+        </div>
+        <div class="dashboard-insight-chart">
+            <canvas id="dashboardProductsChart" aria-label="Productos más vendidos este mes"></canvas>
+            <div class="dashboard-insight-empty" id="dashboardProductsEmpty" hidden>No hay productos de cotizaciones pagadas este mes.</div>
+        </div>
+    </div>
+    <div class="chart-card">
+        <div class="card-header-clean mb-3">
+            <h2 class="h6 fw-bold m-0 text-dark"><i class="fas fa-credit-card text-success me-2"></i>Medios de pago más usados</h2>
+            <span class="text-muted small">Este mes</span>
+        </div>
+        <div class="dashboard-insight-chart">
+            <canvas id="dashboardPaymentMethodsChart" aria-label="Medios de pago utilizados este mes"></canvas>
+            <div class="dashboard-insight-empty" id="dashboardPaymentMethodsEmpty" hidden>No hay pagos registrados este mes.</div>
+        </div>
+    </div>
+</div>
+
+<!-- Cotizaciones Recientes y Alertas -->
+<div class="bottom-grid">
+    <div class="section-card">
+        <div class="card-header-clean">
+            <h2 class="h6 fw-bold m-0 text-dark"><i class="fas fa-folder-open text-primary me-2"></i>Cotizaciones Recientes</h2>
+            <a href="{{ url_for('listar_cotizaciones') }}" class="view-all-link m-0">Ver todas</a>
+        </div>
+        <hr class="my-2 opacity-25">
+        <div class="clean-list" id="cotizacionesRecientes">
+            <div class="text-center py-3">
+                <div class="spinner-border text-primary" role="status" style="width: 2rem; height: 2rem;">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <p class="text-muted small mt-2">Cargando cotizaciones...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="section-card">
+        <div class="card-header-clean">
+            <h2 class="h6 fw-bold m-0 text-dark"><i class="fas fa-triangle-exclamation text-danger me-2"></i>Alertas de Inventario</h2>
+            <a href="{{ url_for('listar_inventario') }}" class="view-all-link text-danger m-0">Ir a Almacén</a>
+        </div>
+        <hr class="my-2 opacity-25">
+        <div class="clean-list" id="alertasStock">
+            <div class="text-center py-3">
+                <div class="spinner-border text-primary" role="status" style="width: 2rem; height: 2rem;">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <p class="text-muted small mt-2">Cargando alertas...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="errorContainer" style="display:none;" class="error-box mt-3"></div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let salesChart = null;
+    let sellersChart = null;
+    let productsChart = null;
+    let paymentMethodsChart = null;
+    let importationsChart = null;
+
+    function formatCurrency(amount) {
+        return 'S/ ' + Number(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+
+    function formatDate(dateStr) {
+        try {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('{{ locale_actual }}', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        } catch(e) {
+            return dateStr;
+        }
+    }
+
+    function getEstadoBadge(estado) {
+        const estados = {
+            'Aprobada': 'success',
+            'Pagada': 'success',
+            'Parcial': 'info',
+            'Pendiente': 'warning',
+            'Rechazado': 'danger',
+            'Rechazada': 'danger'
+        };
+        return estados[estado] || 'secondary';
+    }
+
+    function updateChart(labels, data) {
+        const ctx = document.getElementById('dashboardSalesChart').getContext('2d');
+        if (salesChart) { salesChart.destroy(); }
+
+        const hasData = data.some(v => v > 0);
+
+        salesChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Ventas (S/)',
+                    data: data,
+                    borderColor: '#079da1',
+                    backgroundColor: 'rgba(7, 157, 161, 0.08)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: true,
+                    pointBackgroundColor: '#079da1',
+                    pointRadius: hasData ? 4 : 0,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                if (context.parsed.y === 0) return 'Sin ventas';
+                                return 'Ventas: ' + formatCurrency(context.parsed.y);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        grid: { color: '#f1f5f9' },
+                        ticks: { color: '#64748b', font: { size: 11 }, callback: function(value) { return 'S/ ' + Number(value).toLocaleString('en-US', { maximumFractionDigits: 0 }); } },
+                        beginAtZero: true
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#64748b', font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
+
+    function prepareInsightChart(chart, canvasId, emptyId, hasData) {
+        if (chart) chart.destroy();
+        const canvas = document.getElementById(canvasId);
+        const emptyState = document.getElementById(emptyId);
+        canvas.style.display = hasData ? 'block' : 'none';
+        emptyState.hidden = hasData;
+        return hasData ? canvas.getContext('2d') : null;
+    }
+
+    function updateSellerChart(vendedores) {
+        const datos = vendedores || [];
+        const tieneVentas = datos.some(item => Number(item.total) > 0);
+        const ctx = prepareInsightChart(sellersChart, 'dashboardSellersChart', 'dashboardSellersEmpty', tieneVentas);
+        sellersChart = null;
+        if (!ctx) return;
+        sellersChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: datos.map(item => item.nombre),
+                datasets: [{
+                    label: 'Ventas cobradas',
+                    data: datos.map(item => item.total),
+                    backgroundColor: 'rgba(7, 157, 161, .78)',
+                    borderRadius: 6,
+                    maxBarThickness: 26
+                }]
+            },
+            options: {
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: context => {
+                        const item = datos[context.dataIndex];
+                        return [`Cobrado: ${formatCurrency(context.raw)}`, `Cotizaciones con abonos: ${item.cotizaciones}`];
+                    } } }
+                },
+                scales: {
+                    x: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { color: '#64748b', callback: value => `S/ ${Number(value).toLocaleString('en-US')}` } },
+                    y: { grid: { display: false }, ticks: { color: '#475569', autoSkip: false } }
+                }
+            }
+        });
+    }
+
+    function updateProductsChart(productos) {
+        const datos = productos || [];
+        const ctx = prepareInsightChart(productsChart, 'dashboardProductsChart', 'dashboardProductsEmpty', datos.length > 0);
+        productsChart = null;
+        if (!ctx) return;
+        productsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: datos.map(item => item.nombre),
+                datasets: [{
+                    label: 'Unidades vendidas',
+                    data: datos.map(item => item.cantidad),
+                    backgroundColor: 'rgba(245, 158, 11, .78)',
+                    borderRadius: 6,
+                    maxBarThickness: 24
+                }]
+            },
+            options: {
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                layout: { padding: { right: 8 } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: {
+                        title: items => datos[items[0].dataIndex]?.nombre || '',
+                        label: context => `Unidades: ${context.raw} · ${formatCurrency(datos[context.dataIndex]?.monto || 0)}`
+                    } }
+                },
+                scales: {
+                    x: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { color: '#64748b', precision: 0 } },
+                    y: { grid: { display: false }, ticks: {
+                        color: '#475569', autoSkip: false,
+                        callback: function(value) {
+                            const nombre = String(this.getLabelForValue(value));
+                            return nombre.length > 27 ? `${nombre.slice(0, 25)}…` : nombre;
+                        }
+                    } }
+                }
+            }
+        });
+    }
+
+    function updatePaymentMethodsChart(medios) {
+        const datos = medios || [];
+        const ctx = prepareInsightChart(paymentMethodsChart, 'dashboardPaymentMethodsChart', 'dashboardPaymentMethodsEmpty', datos.length > 0);
+        paymentMethodsChart = null;
+        if (!ctx) return;
+        const colors = ['#079da1', '#f59e0b', '#6366f1', '#ec4899', '#10b981', '#64748b', '#ef4444'];
+        paymentMethodsChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: datos.map(item => item.nombre),
+                datasets: [{
+                    data: datos.map(item => item.operaciones),
+                    backgroundColor: datos.map((_, index) => colors[index % colors.length]),
+                    borderColor: '#fff',
+                    borderWidth: 3,
+                    hoverOffset: 5
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false, cutout: '58%',
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#475569', usePointStyle: true, pointStyle: 'circle', padding: 14 } },
+                    tooltip: { callbacks: { label: context => {
+                        const item = datos[context.dataIndex];
+                        return `${item.nombre}: ${item.operaciones} pagos · ${formatCurrency(item.monto)}`;
+                    } } }
+                }
+            }
+        });
+    }
+
+    function loadImportationsOverview() {
+        const canvas = document.getElementById('dashboardImportsChart');
+        if (!canvas) return;
+        const errorElement = document.getElementById('dashboardImportsError');
+        fetch('/api/dashboard_importaciones', { credentials: 'same-origin' })
+            .then(response => {
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return response.json();
+            })
+            .then(result => {
+                if (!result.success) throw new Error(result.error || 'No se pudieron cargar las importaciones.');
+                const data = result.data;
+                document.getElementById('dashboardImportsTotal').textContent = data.total;
+                document.getElementById('dashboardImportsReview').textContent = data.en_revision;
+                document.getElementById('dashboardImportsDelay').textContent = `${data.demora_promedio} días`;
+                document.getElementById('dashboardImportsRelease').textContent = `${data.levante_promedio} días`;
+                errorElement.hidden = true;
+                if (importationsChart) importationsChart.destroy();
+                importationsChart = null;
+                const labels = (data.canales || []).map(item => item.nombre);
+                const values = (data.canales || []).map(item => item.cantidad);
+                const hasData = values.some(value => value > 0);
+                canvas.style.display = hasData ? 'block' : 'none';
+                document.getElementById('dashboardImportsEmpty').hidden = hasData;
+                if (!hasData) return;
+                const palette = { Verde: '#16a34a', Naranja: '#f59e0b', Rojo: '#dc2626', 'Sin asignar': '#94a3b8' };
+                importationsChart = new Chart(canvas.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: labels.map(label => palette[label] || '#64748b'),
+                            borderColor: '#fff',
+                            borderWidth: 3,
+                            hoverOffset: 5
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, cutout: '62%',
+                        plugins: {
+                            legend: { position: 'bottom', labels: { color: '#475569', usePointStyle: true, pointStyle: 'circle', padding: 14 } },
+                            tooltip: { callbacks: { label: context => `${context.label}: ${context.raw} importaciones` } }
+                        }
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error al cargar resumen de importaciones:', error);
+                errorElement.textContent = 'No se pudo cargar el resumen de importaciones.';
+                errorElement.hidden = false;
+            });
+    }
+
+    function renderCotizacionesRecientes(cotizaciones) {
+        const container = document.getElementById('cotizacionesRecientes');
+        if (!cotizaciones || cotizaciones.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-inbox"></i><p class="small mb-0">No hay cotizaciones recientes</p></div>`;
+            return;
+        }
+
+        let html = '';
+        cotizaciones.forEach(c => {
+            const badgeClass = getEstadoBadge(c.estado);
+            html += `
+                <div class="clean-item">
+                    <div>
+                        <span class="d-block fw-semibold text-dark small">COT-${String(c.id).padStart(4, '0')}</span>
+                        <small class="text-muted">${c.cliente || 'Cliente'}</small>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge-status badge-${badgeClass}">${c.estado || 'Pendiente'}</span>
+                        <span class="d-block fw-bold text-dark small mt-1">${formatCurrency(c.total || 0)}</span>
+                        <small class="text-muted" style="font-size: 0.6rem;">${formatDate(c.fecha)}</small>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    function renderAlertasStock(productos) {
+        const container = document.getElementById('alertasStock');
+        if (!productos || productos.length === 0) {
+            container.innerHTML = `<div class="empty-state"><i class="fas fa-check-circle text-success"></i><p class="small mb-0">✅ ¡Todo en orden! No hay alertas de stock</p></div>`;
+            return;
+        }
+
+        let html = '';
+        productos.forEach(p => {
+            html += `
+                <div class="clean-item">
+                    <div>
+                        <span class="d-block fw-semibold text-dark small">${p.nombre || 'Producto'}</span>
+                        <small class="text-muted">Mín: ${p.umbral || 0} unidades</small>
+                    </div>
+                    <div class="text-end d-flex align-items-center gap-3">
+                        <div>
+                            <span class="text-danger fw-bold small d-block">${p.cantidad || 0} unids</span>
+                            <small class="text-muted">Disponible</small>
+                        </div>
+                        <button class="btn-reorder" onclick="window.location.href='{{ url_for('listar_inventario') }}'">Pedir</button>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    }
+
+    function mostrarError(mensaje) {
+        const container = document.getElementById('errorContainer');
+        container.style.display = 'block';
+        container.innerHTML = '⚠️ ' + mensaje;
+    }
+
+    function loadDashboardData() {
+        document.getElementById('timestampDisplay').textContent = '⏱️ Cargando...';
+        loadImportationsOverview();
+        
+        fetch('/api/dashboard_data', {
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+            }
+            return response.json();
+        })
+        .then(data => {
+            
+            if (!data.success) {
+                mostrarError('Error del servidor: ' + (data.error || 'Error desconocido'));
+                return;
+            }
+
+            const d = data.data;
+
+            // Ocultar error si estaba visible
+            document.getElementById('errorContainer').style.display = 'none';
+
+            // Actualizar KPIs
+            document.getElementById('ventasMes').textContent = formatCurrency(d.ventas_mes || 0);
+            document.getElementById('cotizacionesPendientes').textContent = d.cotizaciones_pendientes || 0;
+            document.getElementById('totalProductos').textContent = d.total_productos || 0;
+            document.getElementById('stockBajo').textContent = d.stock_bajo || 0;
+
+            // Actualizar gráfico
+            updateChart(d.labels_semana || ['Lun','Mar','Mie','Jue','Vie','Sab','Dom'], 
+                       d.ventas_semana || [0,0,0,0,0,0,0]);
+            updateSellerChart(d.ventas_por_vendedor || []);
+            updateProductsChart(d.productos_mas_vendidos || []);
+            updatePaymentMethodsChart(d.medios_pago_mas_usados || []);
+
+            // Actualizar cotizaciones recientes
+            renderCotizacionesRecientes(d.cotizaciones_recientes || []);
+
+            // Actualizar alertas de stock
+            renderAlertasStock(d.productos_stock_bajo || []);
+
+            // Actualizar timestamp
+            const timestamp = d.timestamp || new Date().toLocaleTimeString();
+            document.getElementById('timestampDisplay').textContent = '⏱️ Última actualización: ' + timestamp;
+            document.getElementById('ultimaActualizacion').textContent = 'Actualizado: ' + timestamp;
+        })
+        .catch(error => {
+            console.error('❌ ERROR:', error);
+            mostrarError('Error de conexión: ' + error.message + '. Verifica que el servidor esté corriendo.');
+            document.getElementById('timestampDisplay').textContent = '⏱️ Error al conectar con el servidor';
+            
+            // Mostrar valores por defecto en lugar de "Error"
+            document.getElementById('ventasMes').textContent = 'S/ 0.00';
+            document.getElementById('cotizacionesPendientes').textContent = '0';
+            document.getElementById('totalProductos').textContent = '0';
+            document.getElementById('stockBajo').textContent = '0';
+        });
+    }
+
+    // Cargar datos al iniciar y cada 30 segundos
+    document.addEventListener('DOMContentLoaded', function() {
+        loadDashboardData();
+        setInterval(loadDashboardData, 30000);
+    });
+</script>
+{% endblock %}

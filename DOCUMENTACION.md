@@ -48,26 +48,21 @@ La aplicación sigue una arquitectura modular desacoplada basada en el microfram
 ```
 
 ### 2.1 Estructura del Código Fuente
-* [`app.py`](file:///C:/Users/HP/Desktop/GAT/GAT/app.py): Punto de entrada, configuración del servidor, inyección de variables globales en plantillas Jinja, middleware de idioma y carga dinámica de módulos.
-* [`database.py`](file:///C:/Users/HP/Desktop/GAT/GAT/database.py): Abstracción de conexión a base de datos (`PRAGMA foreign_keys = ON`), esquemas de tablas, índices y funciones de auto-migración de columnas en caliente.
-* [`excel_handler.py`](file:///C:/Users/HP/Desktop/GAT/GAT/excel_handler.py): Motor de ingesta y sincronización bidireccional con hojas de cálculo Excel (`PRODUCTOS.xlsx`).
-* [`lenguajes.py`](file:///C:/Users/HP/Desktop/GAT/GAT/lenguajes.py): Diccionario centralizado de traducción trilingüe (Español `es`, Inglés `en`, Chino tradicional `zh`).
-* [`crear_admin.py`](file:///C:/Users/HP/Desktop/GAT/GAT/crear_admin.py): Utilidad CLI segura para el alta o restablecimiento de la cuenta de Administrador Principal.
-* `routes/`:
-  * [`routes/auth.py`](file:///C:/Users/HP/Desktop/GAT/GAT/routes/auth.py): Manejo de sesiones, autenticación con Flask-Login, control de versiones de sesión y decoradores de roles (`@role_required`, `@admin_required`).
-  * [`routes/admin.py`](file:///C:/Users/HP/Desktop/GAT/GAT/routes/admin.py): Gestión de usuarios, reseteo de credenciales y administración de empresas / razones sociales.
-  * [`routes/dashboard.py`](file:///C:/Users/HP/Desktop/GAT/GAT/routes/dashboard.py): Endpoints del panel principal y API JSON con estadísticas en tiempo real.
-  * [`routes/inventory.py`](file:///C:/Users/HP/Desktop/GAT/GAT/routes/inventory.py): Operaciones CRUD sobre productos, carga segura de imágenes raster y sincronización de Excel.
-  * [`routes/quotes.py`](file:///C:/Users/HP/Desktop/GAT/GAT/routes/quotes.py): Creación, edición en línea con recuperación de borrador, generación de correlativo, búsqueda rápida de clientes y exportación a PDF vía ReportLab.
-  * [`routes/cash_closing.py`](file:///C:/Users/HP/Desktop/GAT/GAT/routes/cash_closing.py): Flujo de apertura, arqueo, ingresos/egresos y consolidación del cierre de caja.
-* `templates/`: Plantillas Jinja2 organizadas por dominio (`admin/`, `cierre_caja/`, `cotizaciones/`, `inventario/`, `pagos/`, `base.html`, `inicio.html`).
-* `static/`: Recursos estáticos (estilos CSS, imágenes de productos en `uploads/products/` y logotipos).
+* `backend/app.py`: Configuración de Flask, variables globales de plantillas, idiomas y registro de rutas.
+* `backend/routes/`: Rutas de autenticación, administración, panel, inventario, cotizaciones y cierres de caja.
+* `backend/excel_handler.py`: Lectura y sincronización del catálogo Excel (`PRODUCTOS.xlsx`).
+* `backend/lenguajes.py`: Diccionario de traducción trilingüe (español, inglés y chino tradicional).
+* `backend/crear_admin.py`: Utilidad CLI para crear o restablecer la cuenta administradora.
+* `database/`: Acceso a SQLite, esquema y base activa `donglai.db`.
+* `frontend/templates/`: Plantillas Jinja2 organizadas por dominio.
+* `frontend/static/`: Estilos, logotipos e imágenes de productos subidas.
+* Los lanzadores `app.py`, `database.py` y `crear_admin.py` de la raíz conservan los comandos anteriores.
 
 ---
 
 ## 3. Modelo de Datos (Base de Datos SQLite)
 
-La base de datos activa reside en `donglai.db`. Todas las relaciones están protegidas mediante restricciones de clave externa.
+La base de datos activa reside en `database/donglai.db`. Todas las relaciones están protegidas mediante restricciones de clave externa.
 
 ### 3.1 Diagrama Entidad-Relación (ERD)
 
@@ -194,6 +189,7 @@ erDiagram
 | **`cotizacion_detalles`** | Ítems individuales dentro de cada cotización | `id`, `cotizacion_id`, `producto_id`, `cantidad`, `unidad` (`und`, `caja`, `paquete`, `par`), `precio_unitario_cotizado`, `costo_unitario`. |
 | **`movimientos_caja`** | Registro de ingresos monetarios por pagos de cotización | `id`, `cotizacion_id`, `fecha`, `ingreso_total`, `costo_total`, `tipo_pago` (Efectivo, Transferencia, Yape/Plin, etc.). |
 | **`cierres_caja`** | Auditoría y liquidación diaria de caja | `id`, `fecha_operativa`, `monto_apertura`, `total_ventas`, `efectivo_en_caja` (físico), `efectivo_teorico`, `diferencia`, `ingresos_extra`, `egresos`, `ganancia_bruta`. |
+| **`importaciones`** | Seguimiento independiente de embarques y despacho | Número de importación, DUA/DAM, fechas de pedido y llegada, transporte, canal SUNAT, levante, incidencias, mercancía y proveedor. |
 
 ---
 
@@ -214,15 +210,15 @@ El sistema implementa control de acceso basado en roles con el decorador `@role_
 ---
 
 ### 4.2 Módulo de Inventario y Catálogo
-* **Sincronización con Excel (`PRODUCTOS.xlsx`):** A través de [`excel_handler.py`](file:///C:/Users/HP/Desktop/GAT/GAT/excel_handler.py), el sistema lee las columnas `Producto`, `Cant/Caja`, `P. Venta Unit (S/)` y las columnas de existencias. 
+* **Sincronización con Excel (`PRODUCTOS.xlsx`):** A través de [`backend/excel_handler.py`](file:///C:/Users/HP/Desktop/GAT/GAT/backend/excel_handler.py), el sistema lee las columnas `Producto`, `Cant/Caja`, `P. Venta Unit (S/)` y las columnas de existencias.
   * La columna `Cant/Caja` se mapea a `unidades_por_caja` (factor de empaque).
   * La importación preserva el stock existente de los productos ya registrados sin sobrescribirlos, evitando pérdidas de conteo físico.
-* **Validación de Archivos:** Las imágenes subidas por producto son analizadas a nivel de cabecera de bytes (*magic numbers*) para asegurar que sean archivos raster legítimos (PNG, JPEG, WEBP) antes de almacenarse en `static/uploads/products/`.
+* **Validación de Archivos:** Las imágenes subidas por producto son analizadas a nivel de cabecera de bytes (*magic numbers*) para asegurar que sean archivos raster legítimos (PNG, JPEG, WEBP) antes de almacenarse en `frontend/static/uploads/products/`.
 
 ---
 
 ### 4.3 Módulo de Cotizaciones y Exportación PDF
-* **Folios Correlativos Automáticos:** Cada cotización genera un número único formateado como `AAAAMM-XXXX` (ejemplo: `202610-0022`), reiniciando la secuencia cada mes automáticamente.
+* **Folios Correlativos Automáticos:** Cada cotización genera un número único formateado como `AAAAMM-XXXX` (ejemplo: `202610-0022`), reiniciando la secuencia en `0001` cada mes automáticamente. El folio mensual se muestra en la lista y el detalle y puede usarse en la búsqueda; el ID interno de la base se conserva para no alterar relaciones e historial.
 * **Autocompletado de Clientes:** Al ingresar el número de celular o RUC/DNI del cliente, una llamada asíncrona (`/cotizaciones/buscar_cliente`) autocompleta el nombre y la dirección, y despliega el historial de las últimas 10 cotizaciones del cliente con sus respectivos estados (incluyendo motivos de rechazo si los hubo).
 * **Edición y Protección contra Pérdidas:**
   * Permite modificar productos, cantidades, precios y costos unitarios directamente desde la vista de detalle.
@@ -242,7 +238,7 @@ El sistema implementa control de acceso basado en roles con el decorador `@role_
 ---
 
 ### 4.5 Dashboard y Analítica en Tiempo Real
-El panel principal ([`templates/inicio.html`](file:///C:/Users/HP/Desktop/GAT/GAT/templates/inicio.html)) consulta periódicamente el endpoint `/api/dashboard-data` para presentar gráficos interactivos mediante Chart.js:
+El panel principal ([`frontend/templates/inicio.html`](file:///C:/Users/HP/Desktop/GAT/GAT/frontend/templates/inicio.html)) consulta periódicamente el endpoint `/api/dashboard-data` para presentar gráficos interactivos mediante Chart.js:
 1. **Ventas de la Semana:** Gráfico de líneas que ilustra la tendencia diaria de cobros.
 2. **Avance por Vendedor:** Gráfico de barras horizontales que mide el monto cobrado y el número de cotizaciones activas de cada trabajador en el mes en curso.
 3. **Top 8 Productos Más Vendidos:** Ranking de artículos con mayor salida física y facturación.
@@ -251,14 +247,19 @@ El panel principal ([`templates/inicio.html`](file:///C:/Users/HP/Desktop/GAT/GA
 
 ---
 
+### 4.6 Control de Importaciones
+El módulo **Control de importaciones** está restringido al administrador principal. Mantiene el historial importado desde `oficial.xlsx`, permite buscar por importación, DUA/DAM, proveedor, agente o mercancía, filtrar por canal SUNAT, agregar y editar registros, y exportar el listado filtrado a Excel. La demora y los días de levante se calculan a partir de las fechas de llegada y de ingreso al Callao.
+
+---
+
 ## 5. Variables de Entorno y Configuración
 
-El archivo [`app.py`](file:///C:/Users/HP/Desktop/GAT/GAT/app.py) soporta parametrización mediante variables de entorno para adaptarse a diferentes entornos locales:
+El archivo [`backend/app.py`](file:///C:/Users/HP/Desktop/GAT/GAT/backend/app.py) soporta parametrización mediante variables de entorno para adaptarse a diferentes entornos locales:
 
 | Variable | Descripción | Valor Predeterminado |
 |---|---|---|
 | `GAT_SECRET_KEY` | Llave secreta para el firmado criptográfico de cookies de sesión | Generada aleatoriamente al iniciar |
-| `GAT_DATABASE_PATH` | Ruta absoluta o relativa al archivo SQLite | `donglai.db` junto al código |
+| `GAT_DATABASE_PATH` | Ruta absoluta o relativa al archivo SQLite | `database/donglai.db` |
 | `GAT_EXCEL_PATH` | Ruta al archivo Excel del inventario maestro | `PRODUCTOS.xlsx` |
 | `GAT_HOST` | Interfaz de red de enlace (`0.0.0.0` para acceso en red local) | `0.0.0.0` |
 | `GAT_PORT` | Puerto TCP del servicio HTTP | `5000` |
@@ -286,6 +287,6 @@ Este script interactivo solicita el número de DNI y la nueva contraseña, promu
 
 ### 6.3 Políticas de Respaldo (Backup)
 Para respaldar completamente el estado del sistema, solo se requiere copiar dos archivos:
-1. **`donglai.db`:** Contiene toda la información transaccional, usuarios, clientes, cotizaciones, pagos y cierres de caja.
+1. **`database/donglai.db`:** Contiene toda la información transaccional, usuarios, clientes, cotizaciones, pagos y cierres de caja.
 2. **`PRODUCTOS.xlsx`:** Catálogo de productos.
-3. **Carpeta `static/uploads/products/`:** Fotografías asociadas a los productos.
+3. **Carpeta `frontend/static/uploads/products/`:** Fotografías asociadas a los productos.

@@ -1,0 +1,460 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ t('cot_editar_titulo') }} #{{ cotizacion.id }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-list-container {
+        border: 1px solid #dee2e6;
+        padding: 28px;
+        min-width: 0;
+        border-radius: 0.5rem;
+        background-color: #fff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .detalle-row {
+        border-bottom: 1px dashed #e9ecef;
+        padding: 8px 4px;
+        transition: background-color 0.2s;
+    }
+    .detalle-row .form-control { min-height:38px; font-size:.9rem; }
+    .detalle-row > div { padding-left:.55rem; padding-right:.55rem; }
+    #detalleCotizacionContainer { max-height:55vh; overflow-y:auto; overscroll-behavior:contain; padding-inline:.25rem; }
+    .cotizacion-edit-page { width:100%; max-width:none; }
+    .detalle-row:hover {
+        background-color: #f8f9fa;
+    }
+    .detalle-row:last-child {
+        border-bottom: none;
+    }
+    .total-summary {
+        font-size: 1.4em;
+        font-weight: 700;
+        color: var(--primary-blue-dark);
+    }
+    /* Estilos responsivos adaptados para inputs móviles */
+    @media (max-width: 767.98px) {
+        .detalle-row {
+            margin-bottom: 1rem;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            background-color: #fff;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid cotizacion-edit-page px-3 px-xl-4 mt-4">
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 gap-2">
+        <h2 class="text-primary mb-0"><i class="fas fa-edit me-2"></i>{{ t('cot_editar_titulo') }} #{{ cotizacion.id }}</h2>
+        <span class="badge bg-secondary fs-6">ID: {{ cotizacion.id }}</span>
+    </div>
+    <hr>
+
+    <form method="POST" action="{{ url_for('editar_cotizacion', id=cotizacion.id) }}" id="editarCotizacionForm" class="needs-validation" novalidate>
+
+
+        {# --- SECCI?N: DATOS DEL CLIENTE --- #}
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-light"><strong>{{ t('sec_datos_cliente') }}</strong></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="fecha" class="form-label">Fecha de emisión (*)</label>
+                        <input type="date" class="form-control" id="fecha" name="fecha" value="{{ cotizacion['fecha'][:10] }}" required>
+                    </div>
+                    <div class="col-12">
+                        <label for="razon_social_id" class="form-label">Razón social emisora (*)</label>
+                        <select class="form-select" id="razon_social_id" name="razon_social_id" required>
+                            <option value="" disabled {% if not cotizacion['razon_social_id'] %}selected{% endif %}>Selecciona la empresa emisora</option>
+                            {% for razon in razones_sociales %}
+                            <option value="{{ razon['id'] }}" {% if razon['id'] == cotizacion['razon_social_id'] %}selected{% endif %}>
+                                {{ razon['nombre'] }}{% if razon['ruc'] %} ? RUC {{ razon['ruc'] }}{% endif %}{% if not razon['activa'] %} (inactiva; solo para esta cotización){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="cliente_nombre" class="form-label">{{ t('cot_col_cliente') }} (*)</label>
+                        <input type="text" class="form-control" id="cliente_nombre" name="cliente_nombre" value="{{ cotizacion.cliente_nombre }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="cliente_celular" class="form-label">{{ t('lbl_celular') }} {{ t('lbl_opcional') }}</label>
+                        <input type="text" class="form-control" id="cliente_celular" name="cliente_celular" value="{{ cotizacion.cliente_celular or '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="cliente_ruc" class="form-label">{{ t('lbl_ruc') }} {{ t('lbl_opcional') }}</label>
+                        <input type="text" class="form-control" id="cliente_ruc" name="cliente_ruc" value="{{ cotizacion.cliente_ruc or '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="cliente_direccion" class="form-label">{{ t('lbl_direccion') }} {{ t('lbl_opcional') }}</label>
+                        <input type="text" class="form-control" id="cliente_direccion" name="cliente_direccion" value="{{ cotizacion.cliente_direccion or '' }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        {# --- SECCIÓN: DETALLES DE PRODUCTOS --- #}
+        <h4 class="mt-4"><i class="fas fa-boxes me-2"></i>{{ t('sec_detalles_prod') }}</h4>
+        <div class="product-list-container mb-4">
+
+            {# Cabecera oculta en móviles #}
+            <div class="row fw-bold border-bottom pb-2 mb-2 d-none d-md-flex text-secondary">
+                <div class="col-md-1 text-center">#</div>
+                <div class="col-md-3">{{ t('inv_col_nombre') }}</div>
+                <div class="col-md-1 text-center">Unidad</div>
+                <div class="col-md-1 text-center">{{ t('inv_col_cant') }}</div>
+                <div class="col-md-2">{{ t('inv_col_precio') }} unitario</div>
+                <div class="col-md-3 text-end">{{ t('col_subtotal') }}</div>
+                <div class="col-md-1"></div>
+            </div>
+
+            <div id="detalleCotizacionContainer"></div>
+
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center mt-4 border-top pt-3 gap-3">
+                <button type="button" class="btn btn-info text-white w-100 w-sm-auto shadow-sm" data-bs-toggle="modal" data-bs-target="#agregarProductoModal">
+                    <i class="fa fa-plus-circle"></i> {{ t('btn_anadir_prod') }}
+                </button>
+                <p class="total-summary mb-0">
+                    {{ t('cot_col_total') }}: <span class="text-primary fw-bold">S/ <span id="totalCotizacionDisplay">0.00</span></span>
+                </p>
+            </div>
+        </div>
+
+        <input type="hidden" id="productos_seleccionados" name="productos_seleccionados" value="">
+
+        {# --- BOTONES DE ACCIÓN --- #}
+        <div class="mt-4 text-center mb-5 d-flex flex-column flex-sm-row justify-content-center gap-2">
+            <button type="submit" name="accion" value="guardar" class="btn btn-success btn-lg px-4 shadow-sm"><i class="fa fa-save"></i> {{ t('btn_guardar') }}</button>
+            <button type="submit" name="accion" value="guardar_pdf" class="btn btn-primary btn-lg px-4 shadow-sm"><i class="fas fa-print me-1"></i>Guardar e imprimir PDF</button>
+            <a href="{{ url_for('listar_cotizaciones') }}" class="btn btn-secondary btn-lg px-5 shadow-sm">{{ t('btn_cancelar') }}</a>
+        </div>
+    </form>
+</div>
+
+{# --- MODAL DE AGREGAR PRODUCTO --- #}
+<div class="modal fade" id="agregarProductoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-cart-plus me-2"></i>{{ t('modal_titulo_prod') }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="producto_filtro" class="form-label fw-bold">{{ t('lbl_buscar_inv') }}</label>
+                    <input type="search" class="form-control mb-2" id="producto_filtro"
+                           placeholder="{{ t('ph_escribe_prod') }}" autocomplete="off">
+                    <small id="producto_filtro_estado" class="form-text text-muted" aria-live="polite"></small>
+                    <label for="producto_select" class="form-label fw-bold mt-2">{{ t('inv_col_nombre') }} (*)</label>
+                    <select class="form-select" id="producto_select">
+                        <option value="">{{ t('lbl_seleccionar') }}</option>
+                        {% for producto in productos_inventario %}
+                            <option value="{{ producto[0] }}"
+                                    data-nombre="{{ producto[1] }}"
+                                    data-precio="{{ producto[2] }}"
+                                    data-costo="{{ producto[3] or 0 }}">
+                                {{ producto[1] }} (S/ {{ producto[2]|dinero }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="row g-3">
+                    <div class="col-4">
+                        <div class="mb-3">
+                            <label for="cantidad_input" class="form-label fw-bold">{{ t('inv_col_cant') }} (*)</label>
+                            <input type="number" class="form-control" id="cantidad_input" value="1" min="1">
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="mb-3">
+                            <label for="precio_input" class="form-label fw-bold">{{ t('inv_col_precio') }} (S/) (*)</label>
+                            <input type="number" class="form-control" id="precio_input" step="0.01" min="0.01">
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="mb-3">
+                            <label for="costo_input" class="form-label fw-bold">Costo unit. (S/)</label>
+                            <input type="number" class="form-control" id="costo_input" step="0.01" min="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('btn_cancelar') }}</button>
+                <button type="button" class="btn btn-primary" onclick="agregarProductoAlDetalle()">{{ t('btn_agregar_lista') }}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let detallesCotizacion = [];
+    const formatMoney = value => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const detallesIniciales = {{ detalles | tojson }};
+
+    // Inicializar datos del backend
+    detallesIniciales.forEach(item => {
+        detallesCotizacion.push({
+            temp_id: Date.now() + Math.random(),
+            producto_id: item.producto_id,
+            nombre: item.nombre_producto,
+            unidad: item.unidad || 'und',
+            cantidad: parseInt(item.cantidad),
+            precio: parseFloat(item.precio_unitario_cotizado),
+            costo: parseFloat(item.costo_unitario || 0)
+        });
+    });
+
+    // --- MANEJO DE CAMBIOS DINÁMICOS DESDE LA TABLA ---
+    function updateDetalleUnidad(tempId, unidad) {
+        const item = detallesCotizacion.find(i => i.temp_id === parseFloat(tempId));
+        if (item) item.unidad = unidad;
+    }
+
+    function updateDetalleCantidad(tempId, val) {
+        const item = detallesCotizacion.find(i => i.temp_id === parseFloat(tempId));
+        if (item) {
+            item.cantidad = Math.max(1, parseInt(val) || 1);
+            calcularYRenderizarTotales();
+        }
+    }
+
+    // Calcula de forma ligera los cambios sin redibujar el DOM completo (evita perder foco del input)
+    function updateDetallePrecio(tempId, val) {
+        const item = detallesCotizacion.find(i => i.temp_id === parseFloat(tempId));
+        if (item) {
+            item.precio = Math.max(0.01, parseFloat(val) || 0.01);
+            calcularYRenderizarTotales();
+        }
+    }
+
+    function updateDetalleCosto(tempId, val) {
+        const item = detallesCotizacion.find(i => i.temp_id === parseFloat(tempId));
+        if (item) {
+            item.costo = Math.max(0, parseFloat(val) || 0);
+            calcularYRenderizarTotales();
+        }
+    }
+
+    function calcularYRenderizarTotales() {
+        let total = 0;
+        let totalCosto = 0;
+        detallesCotizacion.forEach(item => {
+            const subtotal = item.cantidad * item.precio;
+            total += subtotal;
+            totalCosto += item.cantidad * item.costo;
+            const subtotalEl = document.getElementById(`subtotal-${item.temp_id}`);
+            if (subtotalEl) {
+                subtotalEl.textContent = formatMoney(subtotal);
+            }
+        });
+        document.getElementById('totalCotizacionDisplay').textContent = formatMoney(total);
+    }
+
+    // --- RENDERIZADO DEL CONTENEDOR DE PRODUCTOS ---
+    function renderDetalles() {
+        const container = document.getElementById('detalleCotizacionContainer');
+        let total = 0;
+        let totalCosto = 0;
+        let htmlContent = '';
+
+        if (detallesCotizacion.length === 0) {
+            htmlContent = '<div class="alert alert-warning text-center my-3"><i class="fas fa-exclamation-triangle me-2"></i>{{ t("msg_cot_vacia") }}</div>';
+        } else {
+            detallesCotizacion.forEach((item, index) => {
+                const subtotal = item.cantidad * item.precio;
+                total += subtotal;
+                totalCosto += item.cantidad * item.costo;
+
+                htmlContent += `
+                    <div class="detalle-row row align-items-center g-2" id="row-${item.temp_id}">
+                        <div class="col-md-1 col-2 text-center text-muted">
+                            <span class="d-md-none text-muted small d-block fw-normal">#</span>
+                            ${index + 1}
+                        </div>
+                        <div class="col-md-3 col-10 fw-bold text-dark">
+                            <span class="d-md-none text-muted small d-block fw-normal">{{ t('inv_col_nombre') }}:</span>
+                            ${item.nombre}
+                        </div>
+
+                        <div class="col-md-1 col-6">
+                            <span class="d-md-none text-muted small d-block mb-1">Unidad:</span>
+                            <select class="form-select form-select-sm" onchange="updateDetalleUnidad('${item.temp_id}', this.value)">
+                                ${['und', 'caja', 'paquete', 'par'].map(unidad => `<option value="${unidad}" ${item.unidad === unidad ? 'selected' : ''}>${unidad}</option>`).join('')}
+                            </select>
+                        </div>
+
+                        <div class="col-md-1 col-6">
+                            <span class="d-md-none text-muted small d-block mb-1 text-start">{{ t('inv_col_cant') }}:</span>
+                            <input type="number" class="form-control form-control-sm text-center"
+                                   value="${item.cantidad}" min="1"
+                                   oninput="updateDetalleCantidad('${item.temp_id}', this.value)">
+                        </div>
+
+                        <div class="col-md-2 col-6">
+                            <span class="d-md-none text-muted small d-block mb-1">{{ t('inv_col_precio') }} unitario:</span>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text">S/</span>
+                                <input type="number" class="form-control"
+                                       value="${item.precio.toFixed(2)}" step="0.01" min="0.01"
+                                       oninput="updateDetallePrecio('${item.temp_id}', this.value)">
+                            </div>
+                        </div>
+
+                        <div class="col-md-3 col-8 text-md-end fw-bold text-primary mt-2 mt-md-0">
+                            <span class="d-md-none text-muted small d-inline fw-normal me-1">{{ t('col_subtotal') }}:</span>
+                            S/ <span id="subtotal-${item.temp_id}">${formatMoney(subtotal)}</span>
+                        </div>
+
+                        <div class="col-md-1 col-4 text-end mt-2 mt-md-0">
+                            <button type="button" class="btn btn-outline-danger btn-sm"
+                                    onclick="eliminarDetalle('${item.temp_id}')" title="{{ t('btn_eliminar') }}">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        container.innerHTML = htmlContent;
+        document.getElementById('totalCotizacionDisplay').textContent = formatMoney(total);
+    }
+
+    // --- LÓGICA AGREGAR ITEM (INCREMENTA SI YA EXISTE) ---
+    function agregarProductoAlDetalle() {
+        const select = document.getElementById('producto_select');
+        const selectedOption = select.options[select.selectedIndex];
+        const productoId = selectedOption.value;
+        const nombre = selectedOption.getAttribute('data-nombre');
+        const cantidad = parseInt(document.getElementById('cantidad_input').value);
+        const precio = parseFloat(document.getElementById('precio_input').value);
+        const costo = parseFloat(document.getElementById('costo_input').value) || 0;
+
+        if (!productoId || isNaN(cantidad) || cantidad <= 0 || isNaN(precio)) {
+            alert('{{ t("msg_datos_inv") }}'); 
+            return;
+        }
+
+        const productoExistente = detallesCotizacion.find(p => p.producto_id === parseInt(productoId));
+
+        if (productoExistente) {
+            productoExistente.cantidad += cantidad;
+        } else {
+            detallesCotizacion.push({
+                temp_id: Date.now() + Math.random(),
+                producto_id: parseInt(productoId),
+                nombre: nombre,
+                cantidad: cantidad,
+                precio: precio,
+                costo: costo,
+                unidad: 'und'
+            });
+        }
+
+        renderDetalles();
+
+        const modal = bootstrap.Modal.getInstance(document.getElementById('agregarProductoModal'));
+        modal.hide();
+        limpiarModal();
+    }
+
+    function eliminarDetalle(tempId) {
+        if (confirm('{{ t("msg_eliminar_item") }}')) {
+            detallesCotizacion = detallesCotizacion.filter(item => item.temp_id !== parseFloat(tempId));
+            renderDetalles();
+        }
+    }
+
+    function limpiarModal() {
+        document.getElementById('producto_select').value = '';
+        document.getElementById('producto_filtro').value = '';
+        aplicarFiltroProductos();
+        document.getElementById('cantidad_input').value = 1;
+        document.getElementById('precio_input').value = '';
+        document.getElementById('costo_input').value = '';
+    }
+
+    // Autocompletado del Modal al cambiar opción
+    // Filtra el inventario del selector por nombre.
+    const filtroProducto = document.getElementById('producto_filtro');
+    const selectorProductos = document.getElementById('producto_select');
+    const estadoFiltroProducto = document.getElementById('producto_filtro_estado');
+    const opcionInicialProducto = selectorProductos.options[0].cloneNode(true);
+    const opcionesProducto = Array.from(selectorProductos.options).slice(1).map(opcion => opcion.cloneNode(true));
+
+    function aplicarFiltroProductos() {
+        const consulta = filtroProducto.value.trim().toLocaleLowerCase();
+        const seleccionAnterior = selectorProductos.value;
+        const resultados = opcionesProducto.filter(opcion => {
+            const texto = `${opcion.dataset.nombre || ''} ${opcion.textContent || ''}`.toLocaleLowerCase();
+            return !consulta || texto.includes(consulta);
+        });
+
+        // Reconstruir el select evita que los navegadores moviles ignoren option.hidden.
+        selectorProductos.replaceChildren(opcionInicialProducto.cloneNode(true), ...resultados.map(opcion => opcion.cloneNode(true)));
+        if (resultados.some(opcion => opcion.value === seleccionAnterior)) {
+            selectorProductos.value = seleccionAnterior;
+        } else if (seleccionAnterior) {
+            document.getElementById('precio_input').value = '';
+            document.getElementById('costo_input').value = '';
+        }
+
+        if (consulta && resultados.length === 1 && selectorProductos.value !== resultados[0].value) {
+            selectorProductos.value = resultados[0].value;
+            selectorProductos.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        estadoFiltroProducto.textContent = consulta
+            ? (resultados.length === 1 ? 'Producto cargado desde inventario.'
+                : (resultados.length ? `Coincidencias: ${resultados.length}` : 'No se encontraron productos.'))
+            : `${resultados.length} productos disponibles.`;
+    }
+
+    filtroProducto.addEventListener('input', aplicarFiltroProductos);
+    aplicarFiltroProductos();
+
+    document.getElementById('producto_select').addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const precio = selectedOption.getAttribute('data-precio');
+        const costo = selectedOption.getAttribute('data-costo');
+
+        document.getElementById('precio_input').value = precio ? parseFloat(precio).toFixed(2) : '';
+        document.getElementById('costo_input').value = costo ? parseFloat(costo).toFixed(2) : '0.00';
+    });
+
+    // --- VALIDACIÓN Y ENVÍO DEL FORMULARIO ---
+    document.getElementById('editarCotizacionForm').addEventListener('submit', function(event) {
+        const form = this;
+        const detallesFinales = detallesCotizacion.map(item => ({
+            id: item.producto_id,
+            cantidad: item.cantidad,
+            precio: item.precio,
+            costo: item.costo,
+            unidad: item.unidad
+        }));
+
+        document.getElementById('productos_seleccionados').value = JSON.stringify(detallesFinales);
+
+        if (detallesFinales.length === 0) {
+            alert('{{ t("msg_cot_vacia") }}');
+            event.preventDefault();
+            return;
+        }
+
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        form.classList.add('was-validated');
+    });
+
+    document.addEventListener('DOMContentLoaded', renderDetalles);
+</script>
+{% endblock %}

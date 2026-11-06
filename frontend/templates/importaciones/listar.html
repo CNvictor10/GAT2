@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}Control de importaciones{% endblock %}
+{% block extra_css %}
+<style>
+    .imports-page { max-width: 1680px; margin: 0 auto; }
+    .imports-hero {
+        background: linear-gradient(120deg, #16324f, #245b78);
+        border-radius: 16px; color: #fff; padding: 1.5rem 1.75rem;
+        box-shadow: 0 8px 24px rgba(22, 50, 79, .14);
+    }
+    .imports-hero p { color: rgba(255,255,255,.76); }
+    .imports-hero .btn-light { color: #16324f; font-weight: 600; }
+    .imports-kpi {
+        border: 1px solid #e8edf3; border-radius: 13px; background: #fff;
+        box-shadow: 0 3px 12px rgba(15, 23, 42, .04); height: 100%;
+    }
+    .imports-kpi .card-body { display: flex; align-items: center; gap: .9rem; padding: 1rem 1.1rem; }
+    .imports-kpi-icon {
+        width: 44px; height: 44px; border-radius: 12px; display: grid;
+        place-items: center; background: #e9f2f8; color: #245b78; font-size: 1.1rem;
+        flex: 0 0 auto;
+    }
+    .imports-kpi-label { color: #64748b; font-size: .78rem; margin-bottom: .15rem; }
+    .imports-kpi-value { color: #172b4d; font-size: 1.45rem; line-height: 1.2; font-weight: 750; }
+    .imports-panel { border: 1px solid #e8edf3; border-radius: 14px; overflow: hidden; box-shadow: 0 3px 14px rgba(15,23,42,.045); }
+    .imports-panel-head { background: #fff; border-bottom: 1px solid #e8edf3; padding: 1rem 1.15rem; }
+    .imports-table { min-width: 1120px; font-size: .84rem; }
+    .imports-table thead th {
+        background: #f5f8fb; color: #516174; text-transform: uppercase;
+        font-size: .69rem; letter-spacing: .035em; white-space: nowrap;
+        padding: .8rem .7rem; border-bottom: 1px solid #e5ebf1;
+    }
+    .imports-table tbody td { padding: .72rem .7rem; border-color: #edf1f5; }
+    .imports-table .details-row td { background: #f8fafc; padding: .9rem 1rem; }
+    .import-details { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem 1.2rem; }
+    .import-detail-label { color: #718096; display: block; font-size: .7rem; margin-bottom: .15rem; }
+    .import-detail-value { color: #24364b; font-size: .82rem; overflow-wrap: anywhere; }
+    .channel-badge { min-width: 72px; }
+    @media (max-width: 767.98px) {
+        .imports-hero { padding: 1.2rem; }
+        .import-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid py-3 imports-page">
+    <header class="imports-hero d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <div class="small text-uppercase fw-semibold mb-2" style="letter-spacing:.1em;opacity:.76">Logística internacional</div>
+            <h1 class="h3 fw-bold mb-1"><i class="fas fa-ship me-2"></i>Control de importaciones</h1>
+            <p class="mb-0">Organiza pedidos, transporte, fechas y despacho aduanero desde un solo lugar.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-light" href="{{ url_for('nueva_importacion') }}"><i class="fas fa-plus me-1"></i>Nueva importación</a>
+            <a class="btn btn-outline-light" href="{{ url_for('exportar_importaciones_excel', q=busqueda, canal=canal_seleccionado) }}"><i class="fas fa-file-excel me-1"></i>Excel</a>
+            <a class="btn btn-outline-light" href="{{ url_for('exportar_importaciones_pdf', q=busqueda, canal=canal_seleccionado) }}"><i class="fas fa-file-pdf me-1"></i>Reporte PDF</a>
+        </div>
+    </header>
+
+    <section class="row g-3 mb-4" aria-label="Resumen de importaciones">
+        <div class="col-6 col-xl-3"><div class="imports-kpi"><div class="card-body"><div class="imports-kpi-icon"><i class="fas fa-boxes-stacked"></i></div><div><div class="imports-kpi-label">Importaciones registradas</div><div class="imports-kpi-value">{{ indicadores.total or 0 }}</div></div></div></div></div>
+        <div class="col-6 col-xl-3"><div class="imports-kpi"><div class="card-body"><div class="imports-kpi-icon"><i class="fas fa-clock"></i></div><div><div class="imports-kpi-label">Demora promedio</div><div class="imports-kpi-value">{{ (indicadores.demora_promedio or 0)|round(1) }} <small class="fs-6 fw-normal text-muted">días</small></div></div></div></div></div>
+        <div class="col-6 col-xl-3"><div class="imports-kpi"><div class="card-body"><div class="imports-kpi-icon"><i class="fas fa-clipboard-check"></i></div><div><div class="imports-kpi-label">Levante promedio</div><div class="imports-kpi-value">{{ (indicadores.levante_promedio or 0)|round(1) }} <small class="fs-6 fw-normal text-muted">días</small></div></div></div></div></div>
+        <div class="col-6 col-xl-3"><div class="imports-kpi"><div class="card-body"><div class="imports-kpi-icon" style="background:#fff4e5;color:#b45309"><i class="fas fa-shield-halved"></i></div><div><div class="imports-kpi-label">Canales naranja / rojo</div><div class="imports-kpi-value">{{ indicadores.en_revision or 0 }}</div></div></div></div></div>
+    </section>
+
+    <section class="imports-panel">
+        <div class="imports-panel-head">
+            <form method="get" action="{{ url_for('listar_importaciones') }}" class="row g-2 align-items-end">
+                <div class="col-lg-7">
+                    <label class="form-label small fw-semibold" for="q">Buscar importación, DUA/DAM, proveedor, mercancía o transporte</label>
+                    <input class="form-control" id="q" name="q" value="{{ busqueda }}" placeholder="Ej.: proveedor, canal o número de importación">
+                </div>
+                <div class="col-sm-7 col-lg-3">
+                    <label class="form-label small fw-semibold" for="canal">Canal SUNAT</label>
+                    <select class="form-select" id="canal" name="canal">
+                        <option value="">Todos los canales</option>
+                        {% for opcion in ['Verde', 'Naranja', 'Rojo'] %}
+                        <option value="{{ opcion }}" {% if canal_seleccionado == opcion %}selected{% endif %}>{{ opcion }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-5 col-lg-2 d-flex gap-2">
+                    <button class="btn btn-outline-primary flex-grow-1" type="submit"><i class="fas fa-search me-1"></i>Buscar</button>
+                    {% if busqueda or canal_seleccionado %}<a class="btn btn-outline-secondary" href="{{ url_for('listar_importaciones') }}" title="Limpiar filtros"><i class="fas fa-times"></i></a>{% endif %}
+                </div>
+            </form>
+            <div class="d-flex flex-wrap justify-content-between gap-2 mt-3 small text-muted">
+                <span><strong class="text-dark">{{ total_filtrado }}</strong> registro(s) encontrados</span>
+                <span>Mostrando página {{ pagina }} de {{ paginas }} · hasta 50 registros por página</span>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 imports-table">
+                <thead><tr>
+                    <th>N.º</th><th>DUA / DAM</th><th>Proveedor y mercancía</th><th>Pedido</th>
+                    <th>Llegada estimada</th><th>Llegada real</th><th>Canal SUNAT</th>
+                    <th>Demora</th><th>Levante</th><th class="text-end">Acciones</th>
+                </tr></thead>
+                <tbody>
+                    {% for item in importaciones %}
+                    <tr>
+                        <td class="fw-bold text-nowrap">#{{ item.numero_importacion }}</td>
+                        <td class="text-nowrap">{{ item.dua_dam or '—' }}</td>
+                        <td><span class="fw-semibold d-block">{{ item.proveedor or 'Proveedor sin asignar' }}</span><span class="small text-muted">{{ item.categoria_producto or 'Mercancía sin clasificar' }}</span></td>
+                        {% for campo in ['fecha_emision_pedido','fecha_estimada_llegada','fecha_real_llegada'] %}
+                        <td class="text-nowrap">{% if item[campo] %}{{ item[campo][8:10] }}/{{ item[campo][5:7] }}/{{ item[campo][:4] }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                        {% endfor %}
+                        <td>{% if item.canal_sunat %}<span class="badge channel-badge {% if item.canal_sunat == 'Verde' %}text-bg-success{% elif item.canal_sunat == 'Naranja' %}text-bg-warning{% else %}text-bg-danger{% endif %}">{{ item.canal_sunat }}</span>{% else %}<span class="badge text-bg-light text-secondary channel-badge">Pendiente</span>{% endif %}</td>
+                        <td class="text-nowrap">{% if item.demora_dias is not none %}{{ item.demora_dias }} días{% else %}—{% endif %}</td>
+                        <td class="text-nowrap">{% if item.dias_levante is not none %}{{ item.dias_levante }} días{% else %}—{% endif %}</td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#detalle-importacion-{{ item.id }}" aria-expanded="false" aria-controls="detalle-importacion-{{ item.id }}"><i class="fas fa-eye me-1"></i>Detalle</button>
+                            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('editar_importacion', importacion_id=item.id) }}"><i class="fas fa-pen me-1"></i>Editar</a>
+                        </td>
+                    </tr>
+                    <tr class="details-row">
+                        <td colspan="10" class="p-0 border-0">
+                            <div class="collapse" id="detalle-importacion-{{ item.id }}">
+                            <div class="import-details">
+                                {% for etiqueta, valor in [
+                                    ('Puerto de origen', item.puerto_origen),
+                                    ('Transporte / contenedor', item.medio_transporte),
+                                    ('Agente de carga', item.agente_carga),
+                                    ('Ingreso al Callao', item.fecha_ingreso_callao),
+                                    ('Volumen / peso', item.volumen_peso),
+                                    ('Tipo de proveedor', item.tipo_proveedor),
+                                    ('Observaciones', item.incidencias)
+                                ] %}
+                                <div><span class="import-detail-label">{{ etiqueta }}</span><span class="import-detail-value">{% if etiqueta == 'Ingreso al Callao' and valor %}{{ valor[8:10] }}/{{ valor[5:7] }}/{{ valor[:4] }}{% else %}{{ valor or '—' }}{% endif %}</span></div>
+                                {% endfor %}
+                            </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="10" class="text-center text-muted py-5"><i class="fas fa-box-open d-block fs-3 mb-2"></i>No hay importaciones que coincidan con los filtros.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if paginas > 1 %}
+        <footer class="imports-panel-head d-flex justify-content-between align-items-center">
+            <span class="small text-muted">Página {{ pagina }} de {{ paginas }}</span>
+            <div class="btn-group">
+                {% if pagina > 1 %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('listar_importaciones', q=busqueda, canal=canal_seleccionado, pagina=pagina-1) }}">Anterior</a>{% endif %}
+                {% if pagina < paginas %}<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('listar_importaciones', q=busqueda, canal=canal_seleccionado, pagina=pagina+1) }}">Siguiente</a>{% endif %}
+            </div>
+        </footer>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
